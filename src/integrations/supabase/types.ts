@@ -14,7 +14,192 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      employee_sales_data: {
+        Row: {
+          commission_amount: number
+          created_at: string
+          employee_id: string
+          employee_name: string
+          id: string
+          merchant_id: string
+          sales_date: string
+          total_sales: number
+          updated_at: string
+        }
+        Insert: {
+          commission_amount?: number
+          created_at?: string
+          employee_id: string
+          employee_name: string
+          id?: string
+          merchant_id: string
+          sales_date: string
+          total_sales?: number
+          updated_at?: string
+        }
+        Update: {
+          commission_amount?: number
+          created_at?: string
+          employee_id?: string
+          employee_name?: string
+          id?: string
+          merchant_id?: string
+          sales_date?: string
+          total_sales?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_sales_data_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchants: {
+        Row: {
+          clover_api_token: string | null
+          clover_merchant_id: string | null
+          created_at: string
+          id: string
+          shop_name: string
+          timezone: Database["public"]["Enums"]["us_timezone"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clover_api_token?: string | null
+          clover_merchant_id?: string | null
+          created_at?: string
+          id?: string
+          shop_name: string
+          timezone?: Database["public"]["Enums"]["us_timezone"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clover_api_token?: string | null
+          clover_merchant_id?: string | null
+          created_at?: string
+          id?: string
+          shop_name?: string
+          timezone?: Database["public"]["Enums"]["us_timezone"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          commission_percentage: number
+          created_at: string
+          id: string
+          merchant_id: string
+          report_time_cycle: string
+          updated_at: string
+        }
+        Insert: {
+          commission_percentage?: number
+          created_at?: string
+          id?: string
+          merchant_id: string
+          report_time_cycle?: string
+          updated_at?: string
+        }
+        Update: {
+          commission_percentage?: number
+          created_at?: string
+          id?: string
+          merchant_id?: string
+          report_time_cycle?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settings_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: true
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_admin_stores: {
+        Row: {
+          created_at: string
+          id: string
+          merchant_id: string
+          sub_admin_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          merchant_id: string
+          sub_admin_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          merchant_id?: string
+          sub_admin_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_admin_stores_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_admin_stores_sub_admin_id_fkey"
+            columns: ["sub_admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +208,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      us_timezone:
+        | "US/Eastern"
+        | "US/Central"
+        | "US/Mountain"
+        | "US/Pacific"
+        | "US/Alaska"
+        | "US/Hawaii"
+      user_role: "admin" | "sub_admin" | "merchant"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +342,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      us_timezone: [
+        "US/Eastern",
+        "US/Central",
+        "US/Mountain",
+        "US/Pacific",
+        "US/Alaska",
+        "US/Hawaii",
+      ],
+      user_role: ["admin", "sub_admin", "merchant"],
+    },
   },
 } as const
