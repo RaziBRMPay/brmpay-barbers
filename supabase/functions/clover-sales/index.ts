@@ -10,7 +10,6 @@ interface CloverSalesRequest {
   merchantId: string;
   startDate: string;
   endDate: string;
-  cloverMerchantId: string;
 }
 
 interface CloverEmployee {
@@ -39,8 +38,10 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get Clover API token from secure environment variables
+    // Get Clover API credentials from secure environment variables
     const cloverApiToken = Deno.env.get('CLOVER_API_TOKEN');
+    const cloverMerchantId = Deno.env.get('CLOVER_MERCHANT_ID');
+    
     if (!cloverApiToken) {
       return new Response(JSON.stringify({ 
         error: 'Clover API token not configured',
@@ -51,7 +52,17 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const { merchantId, startDate, endDate, cloverMerchantId }: CloverSalesRequest & { cloverMerchantId: string } = await req.json();
+    if (!cloverMerchantId) {
+      return new Response(JSON.stringify({ 
+        error: 'Clover Merchant ID not configured',
+        code: 'MISSING_CLOVER_MERCHANT_ID'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { merchantId, startDate, endDate }: CloverSalesRequest = await req.json();
 
     console.log('Fetching sales data for merchant:', merchantId, 'from', startDate, 'to', endDate);
 
