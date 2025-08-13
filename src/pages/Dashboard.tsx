@@ -92,12 +92,11 @@ const Dashboard = () => {
         console.error('Error calling clover-sales function:', error);
         
         // Check if it's a missing credentials error
-        if (error.message?.includes('MISSING_CLOVER_TOKEN') || 
-            error.message?.includes('MISSING_CLOVER_MERCHANT_ID') ||
-            (data && (data.code === 'MISSING_CLOVER_TOKEN' || data.code === 'MISSING_CLOVER_MERCHANT_ID'))) {
+        if (error.message?.includes('MISSING_CLOVER_CREDENTIALS') || 
+            (data && data.code === 'MISSING_CLOVER_CREDENTIALS')) {
           toast({
             title: "Clover API Setup Required",
-            description: "Please configure your Clover API credentials to fetch sales data",
+            description: "Please configure your Clover API credentials in settings to fetch sales data",
             variant: "destructive",
           });
           return;
@@ -355,9 +354,15 @@ const Dashboard = () => {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-sm text-muted-foreground mt-4">
-                  * This is sample data. Connect your Clover API for real sales data.
-                </p>
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    💡 <strong>Need real data?</strong> Configure your Clover API credentials in{' '}
+                    <a href="/settings" className="text-primary hover:underline font-medium">
+                      Settings
+                    </a>{' '}
+                    to automatically fetch sales data from your Clover account.
+                  </p>
+                </div>
               </div>
             )}
           </CardContent>

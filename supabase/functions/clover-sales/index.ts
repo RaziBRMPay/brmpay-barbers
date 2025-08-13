@@ -38,38 +38,14 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get Clover API credentials from secure environment variables
-    const cloverApiToken = Deno.env.get('CLOVER_API_TOKEN');
-    const cloverMerchantId = Deno.env.get('CLOVER_MERCHANT_ID');
-    
-    if (!cloverApiToken) {
-      return new Response(JSON.stringify({ 
-        error: 'Clover API token not configured',
-        code: 'MISSING_CLOVER_TOKEN'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (!cloverMerchantId) {
-      return new Response(JSON.stringify({ 
-        error: 'Clover Merchant ID not configured',
-        code: 'MISSING_CLOVER_MERCHANT_ID'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const { merchantId, startDate, endDate }: CloverSalesRequest = await req.json();
 
     console.log('Fetching sales data for merchant:', merchantId, 'from', startDate, 'to', endDate);
 
-    // Validate merchant exists
+    // Get merchant's Clover API credentials from database
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
-      .select('id')
+      .select('clover_merchant_id, clover_api_token, shop_name')
       .eq('id', merchantId)
       .single();
 
@@ -80,6 +56,19 @@ const handler = async (req: Request): Promise<Response> => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    if (!merchant.clover_merchant_id || !merchant.clover_api_token) {
+      return new Response(JSON.stringify({ 
+        error: 'Clover API credentials not configured for this merchant',
+        code: 'MISSING_CLOVER_CREDENTIALS'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const cloverApiToken = merchant.clover_api_token;
+    const cloverMerchantId = merchant.clover_merchant_id;
 
     // Convert dates to Unix timestamps for Clover API
     const startTime = new Date(startDate).getTime();
