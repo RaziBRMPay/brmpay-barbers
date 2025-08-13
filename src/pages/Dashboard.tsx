@@ -9,6 +9,7 @@ import { CalendarIcon, DollarSign, Users, TrendingUp, Clock } from 'lucide-react
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 interface MerchantData {
   id: string;
@@ -78,16 +79,45 @@ const Dashboard = () => {
 
     setLoading(true);
     try {
-      // For now, we'll create some sample data since Clover API integration isn't set up yet
-      const sampleData = [
-        { employee_name: 'John Smith', total_sales: 1250.00, commission_amount: 875.00 },
-        { employee_name: 'Sarah Johnson', total_sales: 980.00, commission_amount: 686.00 },
-        { employee_name: 'Mike Davis', total_sales: 1100.00, commission_amount: 770.00 },
-      ];
-      
-      setSalesData(sampleData);
+      // Call the Clover API integration edge function
+      const { data, error } = await supabase.functions.invoke('clover-sales', {
+        body: {
+          merchantId: merchantData.id,
+          startDate: dateRange.from.toISOString(),
+          endDate: dateRange.to.toISOString()
+        }
+      });
+
+      if (error) {
+        console.error('Error calling clover-sales function:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch sales data from Clover",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.success) {
+        setSalesData(data.salesData);
+        toast({
+          title: "Success",
+          description: `Found ${data.salesData.length} employees with sales data`,
+        });
+      } else {
+        toast({
+          title: "Warning",
+          description: data.error || "No sales data found for the selected period",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error('Error generating report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate report",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
