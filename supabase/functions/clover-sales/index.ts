@@ -10,6 +10,7 @@ interface CloverSalesRequest {
   merchantId: string;
   startDate: string;
   endDate: string;
+  cloverMerchantId: string;
 }
 
 interface CloverEmployee {
@@ -38,14 +39,26 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { merchantId, startDate, endDate }: CloverSalesRequest = await req.json();
+    // Get Clover API token from secure environment variables
+    const cloverApiToken = Deno.env.get('CLOVER_API_TOKEN');
+    if (!cloverApiToken) {
+      return new Response(JSON.stringify({ 
+        error: 'Clover API token not configured',
+        code: 'MISSING_CLOVER_TOKEN'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { merchantId, startDate, endDate, cloverMerchantId }: CloverSalesRequest & { cloverMerchantId: string } = await req.json();
 
     console.log('Fetching sales data for merchant:', merchantId, 'from', startDate, 'to', endDate);
 
-    // Get merchant's Clover API credentials
+    // Validate merchant exists
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
-      .select('clover_merchant_id, clover_api_token')
+      .select('id')
       .eq('id', merchantId)
       .single();
 
@@ -57,13 +70,6 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    if (!merchant.clover_merchant_id || !merchant.clover_api_token) {
-      return new Response(JSON.stringify({ error: 'Clover API credentials not configured' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     // Convert dates to Unix timestamps for Clover API
     const startTime = new Date(startDate).getTime();
     const endTime = new Date(endDate).getTime();
@@ -71,10 +77,10 @@ const handler = async (req: Request): Promise<Response> => {
     // Fetch employees from Clover API
     console.log('Fetching employees from Clover API...');
     const employeesResponse = await fetch(
-      `https://api.clover.com/v3/merchants/${merchant.clover_merchant_id}/employees`,
+      `https://api.clover.com/v3/merchants/${cloverMerchantId}/employees`,
       {
         headers: {
-          'Authorization': `Bearer ${merchant.clover_api_token}`,
+          'Authorization': `Bearer ${cloverApiToken}`,
           'Content-Type': 'application/json',
         },
       }
@@ -96,10 +102,10 @@ const handler = async (req: Request): Promise<Response> => {
     // Fetch orders from Clover API
     console.log('Fetching orders from Clover API...');
     const ordersResponse = await fetch(
-      `https://api.clover.com/v3/merchants/${merchant.clover_merchant_id}/orders?filter=createdTime>=${startTime}&filter=createdTime<=${endTime}&expand=lineItems,employee`,
+      `https://api.clover.com/v3/merchants/${cloverMerchantId}/orders?filter=createdTime>=${startTime}&filter=createdTime<=${endTime}&expand=lineItems,employee`,
       {
         headers: {
-          'Authorization': `Bearer ${merchant.clover_api_token}`,
+          'Authorization': `Bearer ${cloverApiToken}`,
           'Content-Type': 'application/json',
         },
       }

@@ -84,12 +84,25 @@ const Dashboard = () => {
         body: {
           merchantId: merchantData.id,
           startDate: dateRange.from.toISOString(),
-          endDate: dateRange.to.toISOString()
+          endDate: dateRange.to.toISOString(),
+          cloverMerchantId: 'DEMO_MERCHANT_ID' // In a real app, this would come from merchant settings
         }
       });
 
       if (error) {
         console.error('Error calling clover-sales function:', error);
+        
+        // Check if it's a missing token error
+        if (error.message?.includes('MISSING_CLOVER_TOKEN') || 
+            (data && data.code === 'MISSING_CLOVER_TOKEN')) {
+          toast({
+            title: "Clover API Setup Required",
+            description: "Please configure your Clover API token to fetch sales data",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         toast({
           title: "Error",
           description: "Failed to fetch sales data from Clover",
@@ -98,7 +111,7 @@ const Dashboard = () => {
         return;
       }
 
-      if (data.success) {
+      if (data?.success) {
         setSalesData(data.salesData);
         toast({
           title: "Success",
@@ -107,7 +120,7 @@ const Dashboard = () => {
       } else {
         toast({
           title: "Warning",
-          description: data.error || "No sales data found for the selected period",
+          description: data?.error || "No sales data found for the selected period",
           variant: "destructive",
         });
       }
