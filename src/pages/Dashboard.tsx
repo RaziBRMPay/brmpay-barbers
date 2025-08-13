@@ -123,6 +123,58 @@ const Dashboard = () => {
     }
   };
 
+  const sendCommissionReport = async () => {
+    if (!dateRange?.from || !dateRange?.to || !merchantData || salesData.length === 0) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-commission-report', {
+        body: {
+          merchantId: merchantData.id,
+          salesData: salesData,
+          dateRange: {
+            from: dateRange.from.toISOString().split('T')[0],
+            to: dateRange.to.toISOString().split('T')[0]
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Error sending commission report:', error);
+        toast({
+          title: "Error",
+          description: "Failed to send email report",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data.success) {
+        toast({
+          title: "📧 Email Sent!",
+          description: `Commission report sent to ${data.sentTo}`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Failed to send email report",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error sending commission report:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send email report",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -242,13 +294,26 @@ const Dashboard = () => {
                 </PopoverContent>
               </Popover>
               
-              <Button 
-                onClick={generateReport}
-                disabled={!dateRange?.from || !dateRange?.to || loading}
-                className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
-              >
-                {loading ? 'Generating...' : 'Generate Report'}
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={generateReport}
+                  disabled={!dateRange?.from || !dateRange?.to || loading}
+                  className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
+                >
+                  {loading ? 'Generating...' : 'Generate Report'}
+                </Button>
+                
+                {salesData.length > 0 && (
+                  <Button 
+                    onClick={sendCommissionReport}
+                    disabled={loading}
+                    variant="outline"
+                    className="hover:shadow-soft transition-all duration-300"
+                  >
+                    📧 Send Email Report
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Sample Sales Data Display */}
