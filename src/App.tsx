@@ -8,6 +8,9 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminUsers from "./pages/AdminUsers";
+import SubAdminDashboard from "./pages/SubAdminDashboard";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -22,6 +25,8 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Merchant Routes */}
             <Route path="/" element={
               <ProtectedRoute allowedRoles={['merchant']}>
                 <Dashboard />
@@ -32,6 +37,26 @@ const App = () => (
                 <Settings />
               </ProtectedRoute>
             } />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminUsers />
+              </ProtectedRoute>
+            } />
+            
+            {/* Sub Admin Routes */}
+            <Route path="/sub-admin" element={
+              <ProtectedRoute allowedRoles={['sub_admin']}>
+                <SubAdminDashboard />
+              </ProtectedRoute>
+            } />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
