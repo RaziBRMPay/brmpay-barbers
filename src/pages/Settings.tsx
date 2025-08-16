@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings as SettingsIcon, Save, RefreshCw, DollarSign, Clock, Users } from 'lucide-react';
+import { Settings as SettingsIcon, Save } from 'lucide-react';
 
 type USTimezone = 'US/Eastern' | 'US/Central' | 'US/Mountain' | 'US/Pacific' | 'US/Alaska' | 'US/Hawaii';
 
@@ -50,7 +50,6 @@ const Settings = () => {
     clover_merchant_id: '',
     clover_api_token: '',
   });
-  const [fetchingShopName, setFetchingShopName] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -104,53 +103,6 @@ const Settings = () => {
       console.error('Error in fetchData:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchShopNameFromClover = async () => {
-    if (!formData.clover_merchant_id || !formData.clover_api_token) {
-      toast({
-        title: 'Missing Credentials',
-        description: 'Please enter your Clover API credentials first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setFetchingShopName(true);
-    try {
-      // Call Clover API to fetch merchant info
-      const response = await fetch(`https://sandbox-api.clover.com/v3/merchants/${formData.clover_merchant_id}`, {
-        headers: {
-          'Authorization': `Bearer ${formData.clover_api_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch merchant info from Clover');
-      }
-
-      const merchantInfo = await response.json();
-      
-      setFormData(prev => ({
-        ...prev,
-        shop_name: merchantInfo.name || prev.shop_name,
-      }));
-
-      toast({
-        title: 'Shop Name Updated',
-        description: `Shop name fetched from Clover: ${merchantInfo.name}`,
-      });
-    } catch (error) {
-      console.error('Error fetching shop name from Clover:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch shop name from Clover. Please check your API credentials.',
-        variant: 'destructive',
-      });
-    } finally {
-      setFetchingShopName(false);
     }
   };
 
@@ -262,39 +214,24 @@ const Settings = () => {
           </div>
         </div>
 
-        <div className="grid gap-8">
+        <div className="grid gap-8 lg:grid-cols-2">
           {/* Shop Configuration */}
           <Card className="shadow-soft border-0 bg-gradient-card">
             <CardHeader>
               <CardTitle>Shop Configuration</CardTitle>
               <CardDescription>
-                Basic information about your barbershop (automatically synced from Clover)
+                Basic information about your barbershop
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="shop_name">Shop Name</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="shop_name"
-                    value={formData.shop_name}
-                    readOnly
-                    className="bg-muted"
-                    placeholder="Shop name will be fetched from Clover"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={fetchShopNameFromClover}
-                    disabled={fetchingShopName || !formData.clover_merchant_id || !formData.clover_api_token}
-                    className="shrink-0"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${fetchingShopName ? 'animate-spin' : ''}`} />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Shop name is automatically fetched from your Clover account
-                </p>
+                <Input
+                  id="shop_name"
+                  value={formData.shop_name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, shop_name: e.target.value }))}
+                  placeholder="Enter your shop name"
+                />
               </div>
 
               <div className="space-y-2">
@@ -318,80 +255,48 @@ const Settings = () => {
             </CardContent>
           </Card>
 
-          {/* Commission & Business Settings */}
-          <div className="grid gap-8 lg:grid-cols-3">
-            <Card className="shadow-soft border-0 bg-gradient-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-base">Commission Rate</CardTitle>
-                  <CardDescription className="text-sm">Employee commission percentage</CardDescription>
-                </div>
-                <DollarSign className="h-5 w-5 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Input
-                    id="commission_percentage"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={formData.commission_percentage}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      commission_percentage: parseFloat(e.target.value) || 0 
-                    }))}
-                    className="text-lg font-semibold"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Percentage of sales that goes to the employee
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Commission Settings */}
+          <Card className="shadow-soft border-0 bg-gradient-card">
+            <CardHeader>
+              <CardTitle>Commission Settings</CardTitle>
+              <CardDescription>
+                Configure how commissions are calculated
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="commission_percentage">Commission Percentage (%)</Label>
+                <Input
+                  id="commission_percentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={formData.commission_percentage}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    commission_percentage: parseFloat(e.target.value) || 0 
+                  }))}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Percentage of sales that goes to the employee
+                </p>
+              </div>
 
-            <Card className="shadow-soft border-0 bg-gradient-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-base">Report Time</CardTitle>
-                  <CardDescription className="text-sm">Daily report generation time</CardDescription>
-                </div>
-                <Clock className="h-5 w-5 text-primary" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Input
-                    id="report_time_cycle"
-                    type="time"
-                    value={formData.report_time_cycle}
-                    onChange={(e) => setFormData(prev => ({ ...prev, report_time_cycle: e.target.value }))}
-                    className="text-lg font-semibold"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Time when daily reports are generated and sent
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft border-0 bg-gradient-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div>
-                  <CardTitle className="text-base">Active Employees</CardTitle>
-                  <CardDescription className="text-sm">Current staff count</CardDescription>
-                </div>
-                <Users className="h-5 w-5 text-warning" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="text-lg font-semibold">3</div>
-                  <p className="text-xs text-muted-foreground">
-                    Based on Clover employee data
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="report_time_cycle">Daily Report Time</Label>
+                <Input
+                  id="report_time_cycle"
+                  type="time"
+                  value={formData.report_time_cycle}
+                  onChange={(e) => setFormData(prev => ({ ...prev, report_time_cycle: e.target.value }))}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Time when daily reports are generated and sent
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Clover API Configuration */}
