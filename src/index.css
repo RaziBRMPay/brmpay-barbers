@@ -8,51 +8,78 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Professional Barber Shop Color Palette */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Professional Business Color Palette */
+    --background: 250 250% 99%;
+    --foreground: 215 25% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 215 25% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 215 25% 15%;
 
-    /* Dark navy primary for professional look */
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Navy Blue Primary */
+    --primary: 215 85% 25%;
+    --primary-foreground: 0 0% 98%;
+    --primary-glow: 215 85% 35%;
 
-    /* Light gray secondary */
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Warm Gray Secondary */
+    --secondary: 215 15% 95%;
+    --secondary-foreground: 215 25% 25%;
 
-    /* Muted grays */
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Light Gray Muted */
+    --muted: 215 15% 96%;
+    --muted-foreground: 215 15% 45%;
 
-    /* Accent color for highlights */
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Success Green Accent */
+    --accent: 160 75% 45%;
+    --accent-foreground: 0 0% 98%;
+    --accent-light: 160 55% 92%;
 
-    /* Error state */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Error Red */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    /* Borders and inputs */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Warning Orange */
+    --warning: 35 85% 55%;
+    --warning-foreground: 0 0% 98%;
+
+    /* Neutral Borders & Inputs */
+    --border: 215 15% 88%;
+    --input: 215 15% 94%;
+    --ring: 215 85% 25%;
+
+    /* Business Dashboard Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(215 85% 25%), hsl(215 85% 35%));
+    --gradient-success: linear-gradient(135deg, hsl(160 75% 45%), hsl(160 75% 55%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(215 15% 98%));
+
+    /* Professional Shadows */
+    --shadow-soft: 0 2px 8px hsl(215 25% 15% / 0.08);
+    --shadow-medium: 0 4px 16px hsl(215 25% 15% / 0.12);
+    --shadow-strong: 0 8px 32px hsl(215 25% 15% / 0.16);
+    --shadow-glow: 0 0 20px hsl(215 85% 25% / 0.15);
+
+    /* Animation Variables */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 
-    /* Sidebar styling */
     --sidebar-background: 0 0% 98%;
+
     --sidebar-foreground: 240 5.3% 26.1%;
+
     --sidebar-primary: 240 5.9% 10%;
+
     --sidebar-primary-foreground: 0 0% 98%;
+
     --sidebar-accent: 240 4.8% 95.9%;
+
     --sidebar-accent-foreground: 240 5.9% 10%;
+
     --sidebar-border: 220 13% 91%;
+
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
