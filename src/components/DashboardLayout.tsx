@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, Scissors, BarChart3, Settings, Users, Building2 } from 'lucide-react';
+import { LogOut, Scissors, BarChart3, Settings, Users, Building2, FileText } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 interface DashboardLayoutProps {
@@ -29,6 +29,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
       case 'merchant':
         return [
           { href: '/', label: 'Dashboard', icon: BarChart3 },
+          { href: '/reports', label: 'Reports', icon: FileText },
           { href: '/settings', label: 'Settings', icon: Settings },
         ];
       default:

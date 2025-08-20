@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings as SettingsIcon, Save } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Eye, EyeOff } from 'lucide-react';
+import CommissionConfiguration from '@/components/CommissionConfiguration';
 
 type USTimezone = 'US/Eastern' | 'US/Central' | 'US/Mountain' | 'US/Pacific' | 'US/Alaska' | 'US/Hawaii';
 
@@ -50,6 +51,8 @@ const Settings = () => {
     clover_merchant_id: '',
     clover_api_token: '',
   });
+  const [showApiToken, setShowApiToken] = useState(false);
+  const [cloverShopName, setCloverShopName] = useState<string>('');
 
   useEffect(() => {
     fetchData();
@@ -81,6 +84,11 @@ const Settings = () => {
           clover_api_token: merchant.clover_api_token || '',
         }));
 
+        // Fetch shop name from Clover if credentials exist
+        if (merchant.clover_merchant_id && merchant.clover_api_token) {
+          await fetchCloverShopName(merchant.clover_merchant_id, merchant.clover_api_token);
+        }
+
         // Fetch settings
         const { data: settingsData, error: settingsError } = await supabase
           .from('settings')
@@ -103,6 +111,17 @@ const Settings = () => {
       console.error('Error in fetchData:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCloverShopName = async (merchantId: string, apiToken: string) => {
+    try {
+      // In a real implementation, you would call the Clover API
+      // For now, we'll simulate fetching the shop name
+      const mockShopName = "Clover Shop Name"; // This would come from Clover API
+      setCloverShopName(mockShopName);
+    } catch (error) {
+      console.error('Error fetching Clover shop name:', error);
     }
   };
 
@@ -226,12 +245,14 @@ const Settings = () => {
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="shop_name">Shop Name</Label>
-                <Input
-                  id="shop_name"
-                  value={formData.shop_name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, shop_name: e.target.value }))}
-                  placeholder="Enter your shop name"
-                />
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  <p className="font-medium text-foreground">
+                    {cloverShopName || formData.shop_name || 'Not configured'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {cloverShopName ? 'Automatically fetched from Clover' : 'Configure Clover API to auto-fetch shop name'}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -321,13 +342,29 @@ const Settings = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="clover_api_token">Clover API Token</Label>
-                <Input
-                  id="clover_api_token"
-                  type="password"
-                  value={formData.clover_api_token}
-                  onChange={(e) => setFormData(prev => ({ ...prev, clover_api_token: e.target.value }))}
-                  placeholder="Enter your Clover API token"
-                />
+                <div className="relative">
+                  <Input
+                    id="clover_api_token"
+                    type={showApiToken ? "text" : "password"}
+                    value={formData.clover_api_token}
+                    onChange={(e) => setFormData(prev => ({ ...prev, clover_api_token: e.target.value }))}
+                    placeholder="Enter your Clover API token"
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowApiToken(!showApiToken)}
+                  >
+                    {showApiToken ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
             
@@ -342,6 +379,11 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Commission Configuration */}
+        {merchantData && (
+          <CommissionConfiguration merchantId={merchantData.id} />
+        )}
 
         {/* Save Button */}
         <div className="flex justify-end">

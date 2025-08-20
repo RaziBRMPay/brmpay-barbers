@@ -7,13 +7,51 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
+      employee_commissions: {
+        Row: {
+          commission_percentage: number
+          created_at: string
+          employee_id: string
+          employee_name: string
+          id: string
+          merchant_id: string
+          updated_at: string
+        }
+        Insert: {
+          commission_percentage?: number
+          created_at?: string
+          employee_id: string
+          employee_name: string
+          id?: string
+          merchant_id: string
+          updated_at?: string
+        }
+        Update: {
+          commission_percentage?: number
+          created_at?: string
+          employee_id?: string
+          employee_name?: string
+          id?: string
+          merchant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_commissions_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_sales_data: {
         Row: {
           commission_amount: number
@@ -129,11 +167,53 @@ export type Database = {
         }
         Relationships: []
       }
+      reports: {
+        Row: {
+          created_at: string
+          file_name: string | null
+          file_url: string | null
+          id: string
+          merchant_id: string
+          report_data: Json | null
+          report_date: string
+          report_type: string
+        }
+        Insert: {
+          created_at?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          merchant_id: string
+          report_data?: Json | null
+          report_date: string
+          report_type?: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          merchant_id?: string
+          report_data?: Json | null
+          report_date?: string
+          report_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           commission_percentage: number
           created_at: string
           id: string
+          last_completed_report_cycle_time: string | null
           merchant_id: string
           report_time_cycle: string
           updated_at: string
@@ -142,6 +222,7 @@ export type Database = {
           commission_percentage?: number
           created_at?: string
           id?: string
+          last_completed_report_cycle_time?: string | null
           merchant_id: string
           report_time_cycle?: string
           updated_at?: string
@@ -150,6 +231,7 @@ export type Database = {
           commission_percentage?: number
           created_at?: string
           id?: string
+          last_completed_report_cycle_time?: string | null
           merchant_id?: string
           report_time_cycle?: string
           updated_at?: string

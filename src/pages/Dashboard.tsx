@@ -4,6 +4,8 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/DateRangePicker';
+import DashboardMetrics from '@/components/DashboardMetrics';
+import EmployeeCard from '@/components/EmployeeCard';
 import { DollarSign, Users, TrendingUp, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -19,6 +21,14 @@ interface MerchantData {
 interface SettingsData {
   commission_percentage: number;
   report_time_cycle: string;
+  last_completed_report_cycle_time?: string;
+}
+
+interface EmployeeMetrics {
+  employee_name: string;
+  total_sales: number;
+  commission_amount: number;
+  shop_commission: number;
 }
 
 const Dashboard = () => {
@@ -26,7 +36,7 @@ const Dashboard = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [merchantData, setMerchantData] = useState<MerchantData | null>(null);
   const [settings, setSettings] = useState<SettingsData | null>(null);
-  const [salesData, setSalesData] = useState([]);
+  const [salesData, setSalesData] = useState<EmployeeMetrics[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -110,7 +120,13 @@ const Dashboard = () => {
       }
 
       if (data?.success) {
-        setSalesData(data.salesData);
+        // Calculate shop commission for each employee
+        const salesDataWithShopCommission = data.salesData.map((employee: any) => ({
+          ...employee,
+          shop_commission: employee.total_sales - employee.commission_amount
+        }));
+        
+        setSalesData(salesDataWithShopCommission);
         toast({
           title: "Success",
           description: `Found ${data.salesData.length} employees with sales data`,
@@ -209,21 +225,11 @@ const Dashboard = () => {
           </p>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="shadow-soft border-0 bg-gradient-card">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Commission Rate</CardTitle>
-              <DollarSign className="h-4 w-4 text-accent" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-accent">
-                {settings?.commission_percentage || 70}%
-              </div>
-              <p className="text-xs text-muted-foreground">Current rate</p>
-            </CardContent>
-          </Card>
+        {/* Global Metrics */}
+        <DashboardMetrics salesData={salesData} loading={loading} />
 
+        {/* Quick Stats */}
+        <div className="grid gap-6 md:grid-cols-3">
           <Card className="shadow-soft border-0 bg-gradient-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Report Time</CardTitle>
@@ -256,8 +262,8 @@ const Dashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-xs text-muted-foreground">Sample data</p>
+              <div className="text-2xl font-bold">{salesData.length}</div>
+              <p className="text-xs text-muted-foreground">With sales data</p>
             </CardContent>
           </Card>
         </div>
@@ -301,33 +307,16 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Sample Sales Data Display */}
+            {/* Employee Cards Display */}
             {salesData.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-4">Commission Report</h3>
-                <div className="bg-white rounded-lg shadow-soft overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Employee</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium">Total Sales</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium">Commission ({settings?.commission_percentage}%)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {salesData.map((employee: any, index: number) => (
-                        <tr key={index} className="hover:bg-muted/50">
-                          <td className="px-4 py-3 font-medium">{employee.employee_name}</td>
-                          <td className="px-4 py-3 text-right">${employee.total_sales.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-accent">
-                            ${employee.commission_amount.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <h3 className="text-lg font-semibold mb-4">Employee Performance</h3>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {salesData.map((employee, index) => (
+                    <EmployeeCard key={index} employee={employee} />
+                  ))}
                 </div>
-                <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     💡 <strong>Need real data?</strong> Configure your Clover API credentials in{' '}
                     <a href="/settings" className="text-primary hover:underline font-medium">

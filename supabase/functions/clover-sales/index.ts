@@ -160,23 +160,41 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
-    // Get commission percentage for this merchant
+    // Get default commission percentage for this merchant
     const { data: settings } = await supabase
       .from('settings')
       .select('commission_percentage')
       .eq('merchant_id', merchantId)
       .single();
 
-    const commissionRate = (settings?.commission_percentage || 70) / 100;
+    const defaultCommissionRate = (settings?.commission_percentage || 70) / 100;
 
-    // Convert to array and calculate commissions
-    const salesData = Array.from(salesByEmployee.entries()).map(([employeeId, data]) => ({
-      employee_id: employeeId,
-      employee_name: data.name,
-      total_sales: data.totalSales / 100, // Convert from cents to dollars
-      order_count: data.orderCount,
-      commission_amount: (data.totalSales / 100) * commissionRate,
-    }));
+    // Get individual employee commission rates
+    const { data: employeeCommissions } = await supabase
+      .from('employee_commissions')
+      .select('employee_id, commission_percentage')
+      .eq('merchant_id', merchantId);
+
+    const employeeCommissionMap = new Map<string, number>();
+    employeeCommissions?.forEach(ec => {
+      employeeCommissionMap.set(ec.employee_id, ec.commission_percentage / 100);
+    });
+
+    // Convert to array and calculate commissions using individual rates
+    const salesData = Array.from(salesByEmployee.entries()).map(([employeeId, data]) => {
+      const commissionRate = employeeCommissionMap.get(employeeId) || defaultCommissionRate;
+      const totalSales = data.totalSales / 100; // Convert from cents to dollars
+      const commissionAmount = totalSales * commissionRate;
+      
+      return {
+        employee_id: employeeId,
+        employee_name: data.name,
+        total_sales: totalSales,
+        order_count: data.orderCount,
+        commission_amount: commissionAmount,
+        commission_rate: commissionRate * 100, // Store as percentage for display
+      };
+    });
 
     // Store sales data in database for historical tracking
     const salesDataForStorage = salesData.map(data => ({
