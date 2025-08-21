@@ -8,8 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings as SettingsIcon, Save, Eye, EyeOff } from 'lucide-react';
+import { Settings as SettingsIcon, Save } from 'lucide-react';
 import CommissionConfiguration from '@/components/CommissionConfiguration';
+import SecureCredentialManager from '@/components/SecureCredentialManager';
+import SecurityAuditLog from '@/components/SecurityAuditLog';
 
 type USTimezone = 'US/Eastern' | 'US/Central' | 'US/Mountain' | 'US/Pacific' | 'US/Alaska' | 'US/Hawaii';
 
@@ -17,8 +19,6 @@ interface MerchantData {
   id: string;
   shop_name: string;
   timezone: USTimezone;
-  clover_merchant_id?: string;
-  clover_api_token?: string;
 }
 
 interface SettingsData {
@@ -48,10 +48,7 @@ const Settings = () => {
     timezone: 'US/Eastern' as USTimezone,
     commission_percentage: 70,
     report_time_cycle: '21:00',
-    clover_merchant_id: '',
-    clover_api_token: '',
   });
-  const [showApiToken, setShowApiToken] = useState(false);
   const [cloverShopName, setCloverShopName] = useState<string>('');
 
   useEffect(() => {
@@ -80,14 +77,10 @@ const Settings = () => {
           ...prev,
           shop_name: merchant.shop_name || '',
           timezone: (merchant.timezone as USTimezone) || 'US/Eastern',
-          clover_merchant_id: merchant.clover_merchant_id || '',
-          clover_api_token: merchant.clover_api_token || '',
         }));
 
-        // Fetch shop name from Clover if credentials exist
-        if (merchant.clover_merchant_id && merchant.clover_api_token) {
-          await fetchCloverShopName(merchant.clover_merchant_id, merchant.clover_api_token);
-        }
+        // Fetch shop name from Clover via secure credentials
+        await fetchCloverShopNameSecure(merchant.id);
 
         // Fetch settings
         const { data: settingsData, error: settingsError } = await supabase
@@ -114,14 +107,21 @@ const Settings = () => {
     }
   };
 
-  const fetchCloverShopName = async (merchantId: string, apiToken: string) => {
+  const fetchCloverShopNameSecure = async (merchantId: string) => {
     try {
-      // In a real implementation, you would call the Clover API
-      // For now, we'll simulate fetching the shop name
-      const mockShopName = "Clover Shop Name"; // This would come from Clover API
-      setCloverShopName(mockShopName);
+      // Fetch shop name through secure edge function
+      const { data, error } = await supabase.functions.invoke('clover-shop-info', {
+        body: { merchantId }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.shopName) {
+        setCloverShopName(data.shopName);
+      }
     } catch (error) {
       console.error('Error fetching Clover shop name:', error);
+      // Don't show error to user for security reasons
     }
   };
 
@@ -136,8 +136,6 @@ const Settings = () => {
           .update({
             shop_name: formData.shop_name,
             timezone: formData.timezone,
-            clover_merchant_id: formData.clover_merchant_id,
-            clover_api_token: formData.clover_api_token,
           })
           .eq('id', merchantData.id);
 
@@ -149,8 +147,6 @@ const Settings = () => {
             user_id: profile?.id,
             shop_name: formData.shop_name,
             timezone: formData.timezone,
-            clover_merchant_id: formData.clover_merchant_id,
-            clover_api_token: formData.clover_api_token,
           })
           .select()
           .single();
@@ -320,69 +316,19 @@ const Settings = () => {
           </Card>
         </div>
 
-        {/* Clover API Configuration */}
-        <Card className="shadow-soft border-0 bg-gradient-card">
-          <CardHeader>
-            <CardTitle>Clover API Configuration</CardTitle>
-            <CardDescription>
-              Connect your Clover account to fetch sales data automatically
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="clover_merchant_id">Clover Merchant ID</Label>
-                <Input
-                  id="clover_merchant_id"
-                  value={formData.clover_merchant_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, clover_merchant_id: e.target.value }))}
-                  placeholder="Enter your Clover merchant ID"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="clover_api_token">Clover API Token</Label>
-                <div className="relative">
-                  <Input
-                    id="clover_api_token"
-                    type={showApiToken ? "text" : "password"}
-                    value={formData.clover_api_token}
-                    onChange={(e) => setFormData(prev => ({ ...prev, clover_api_token: e.target.value }))}
-                    placeholder="Enter your Clover API token"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowApiToken(!showApiToken)}
-                  >
-                    {showApiToken ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-muted/50 rounded-lg p-4">
-              <h4 className="font-medium mb-2">How to get your Clover API credentials:</h4>
-              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                <li>Log in to your Clover dashboard</li>
-                <li>Navigate to Account & Setup → API Tokens</li>
-                <li>Create a new API token with required permissions</li>
-                <li>Copy your Merchant ID and API Token here</li>
-              </ol>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Secure Clover API Configuration */}
+        {merchantData && (
+          <SecureCredentialManager merchantId={merchantData.id} />
+        )}
 
         {/* Commission Configuration */}
         {merchantData && (
           <CommissionConfiguration merchantId={merchantData.id} />
+        )}
+
+        {/* Security Audit Log */}
+        {merchantData && (
+          <SecurityAuditLog merchantId={merchantData.id} maxEntries={20} />
         )}
 
         {/* Save Button */}

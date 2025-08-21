@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import SubAdminDashboard from "./pages/SubAdminDashboard";
 import Settings from "./pages/Settings";
+import SecuritySettings from "./pages/SecuritySettings";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
@@ -36,6 +37,11 @@ const App = () => (
             <Route path="/settings" element={
               <ProtectedRoute allowedRoles={['merchant']}>
                 <Settings />
+              </ProtectedRoute>
+            } />
+            <Route path="/security" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <SecuritySettings />
               </ProtectedRoute>
             } />
             <Route path="/reports" element={

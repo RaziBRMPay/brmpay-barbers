@@ -42,3 +42,18 @@ port = 54326
 [analytics]
 enabled = true
 port = 54327
+
+[functions.auto-report-scheduler]
+verify_jwt = false
+
+[functions.clover-sales]
+verify_jwt = true
+
+[functions.clover-shop-info]
+verify_jwt = true
+
+[functions.generate-pdf-report]
+verify_jwt = false
+
+[functions.send-commission-report]
+verify_jwt = false

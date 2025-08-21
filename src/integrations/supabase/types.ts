@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_rate_limits: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          identifier: string
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          identifier: string
+          request_count?: number
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          identifier?: string
+          request_count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       employee_commissions: {
         Row: {
           commission_percentage: number
@@ -98,8 +125,6 @@ export type Database = {
       }
       merchants: {
         Row: {
-          clover_api_token: string | null
-          clover_merchant_id: string | null
           created_at: string
           id: string
           shop_name: string
@@ -108,8 +133,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          clover_api_token?: string | null
-          clover_merchant_id?: string | null
           created_at?: string
           id?: string
           shop_name: string
@@ -118,8 +141,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          clover_api_token?: string | null
-          clover_merchant_id?: string | null
           created_at?: string
           id?: string
           shop_name?: string
@@ -208,6 +229,81 @@ export type Database = {
           },
         ]
       }
+      secure_credentials: {
+        Row: {
+          created_at: string
+          created_by: string
+          credential_type: string
+          encrypted_value: string
+          id: string
+          is_active: boolean
+          merchant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          credential_type: string
+          encrypted_value: string
+          id?: string
+          is_active?: boolean
+          merchant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          credential_type?: string
+          encrypted_value?: string
+          id?: string
+          is_active?: boolean
+          merchant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      security_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          id: string
+          ip_address: unknown | null
+          merchant_id: string | null
+          resource_id: string | null
+          resource_type: string
+          success: boolean
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown | null
+          merchant_id?: string | null
+          resource_id?: string | null
+          resource_type: string
+          success?: boolean
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown | null
+          merchant_id?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           commission_percentage: number
@@ -287,7 +383,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      log_security_event: {
+        Args: {
+          p_action: string
+          p_error_message?: string
+          p_merchant_id: string
+          p_resource_id?: string
+          p_resource_type: string
+          p_success?: boolean
+        }
+        Returns: undefined
+      }
+      validate_merchant_access: {
+        Args: { target_merchant_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       us_timezone:

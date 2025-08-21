@@ -4,6 +4,10 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY', 
+  'X-XSS-Protection': '1; mode=block',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 };
 
 interface CloverSalesRequest {
@@ -33,31 +37,69 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Input validation
+    const requestBody = await req.json();
+    const { merchantId, startDate, endDate } = requestBody;
+
+    // Validate required fields
+    if (!merchantId || !startDate || !endDate) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: merchantId, startDate, endDate' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate date format
+    const startDateTime = new Date(startDate);
+    const endDateTime = new Date(endDate);
+    
+    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid date format. Use ISO 8601 format.' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate merchant ID format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(merchantId)) {
+      return new Response(JSON.stringify({ 
+        error: 'Invalid merchant ID format' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     // Initialize Supabase client with service role for server-side operations
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { merchantId, startDate, endDate }: CloverSalesRequest = await req.json();
+    const { merchantId, startDate, endDate }: CloverSalesRequest = requestBody;
 
     console.log('Fetching sales data for merchant:', merchantId, 'from', startDate, 'to', endDate);
 
-    // Get merchant's Clover API credentials from database
-    const { data: merchant, error: merchantError } = await supabase
-      .from('merchants')
-      .select('clover_merchant_id, clover_api_token, shop_name')
-      .eq('id', merchantId)
-      .single();
+    // Get merchant's Clover API credentials from secure storage
+    const { data: credentials, error: credError } = await supabase
+      .from('secure_credentials')
+      .select('credential_type, encrypted_value')
+      .eq('merchant_id', merchantId)
+      .eq('is_active', true)
+      .in('credential_type', ['clover_merchant_id', 'clover_api_token']);
 
-    if (merchantError || !merchant) {
-      console.error('Error fetching merchant:', merchantError);
-      return new Response(JSON.stringify({ error: 'Merchant not found' }), {
-        status: 404,
+    if (credError) {
+      console.error('Error fetching secure credentials:', credError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch credentials' }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    if (!merchant.clover_merchant_id || !merchant.clover_api_token) {
+    if (!credentials || credentials.length !== 2) {
       return new Response(JSON.stringify({ 
         error: 'Clover API credentials not configured for this merchant',
         code: 'MISSING_CLOVER_CREDENTIALS'
@@ -67,8 +109,23 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const cloverApiToken = merchant.clover_api_token;
-    const cloverMerchantId = merchant.clover_merchant_id;
+    // Simple decryption - replace with proper decryption in production
+    const simpleDecrypt = (encrypted: string): string => {
+      try {
+        return atob(encrypted);
+      } catch {
+        return '';
+      }
+    };
+
+    // Decrypt credentials
+    const credMap: Record<string, string> = {};
+    credentials.forEach(cred => {
+      credMap[cred.credential_type] = simpleDecrypt(cred.encrypted_value);
+    });
+
+    const cloverApiToken = credMap.clover_api_token;
+    const cloverMerchantId = credMap.clover_merchant_id;
 
     // Convert dates to Unix timestamps for Clover API
     const startTime = new Date(startDate).getTime();

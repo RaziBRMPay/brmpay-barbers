@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, Scissors, BarChart3, Settings, Users, Building2, FileText } from 'lucide-react';
+import { LogOut, Scissors, BarChart3, Settings, Users, Building2, FileText, Shield } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 interface DashboardLayoutProps {
@@ -20,6 +20,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           { href: '/admin', label: 'Dashboard', icon: BarChart3 },
           { href: '/admin/users', label: 'User Management', icon: Users },
           { href: '/admin/merchants', label: 'Merchants', icon: Building2 },
+          { href: '/security', label: 'Security', icon: Shield },
         ];
       case 'sub_admin':
         return [
