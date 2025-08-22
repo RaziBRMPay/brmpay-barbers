@@ -97,26 +97,41 @@ export function DateRangePicker({
 
   // Preset: Yesterday
   const selectYesterday = () => {
-    if (!lastCompletedReportCycleTime) {
-      // Fallback if no last completed cycle time
-      const yesterday = subDays(new Date(), 1);
-      const startOfCycle = applyReportCycleTime(yesterday);
-      const endOfCycle = applyReportCycleTime(new Date());
-
-      onDateRangeChange({
-        from: startOfCycle,
-        to: endOfCycle
-      });
+    const now = new Date();
+    const todayReportCycle = applyReportCycleTime(new Date());
+    
+    let startOfRange: Date;
+    let endOfRange: Date;
+    
+    // If current time is after today's report cycle time, yesterday = yesterday's cycle to today's cycle
+    // If current time is before today's report cycle time, yesterday = day before yesterday's cycle to yesterday's cycle
+    if (now >= todayReportCycle) {
+      // Today's cycle has started, so yesterday = yesterday's cycle to today's cycle
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      startOfRange = applyReportCycleTime(yesterday);
+      endOfRange = todayReportCycle;
     } else {
-      // Use exact 24-hour period ending at last completed cycle
-      const endTime = lastCompletedReportCycleTime;
-      const startTime = subDays(endTime, 1);
-
-      onDateRangeChange({
-        from: startTime,
-        to: endTime
-      });
+      // Today's cycle hasn't started yet, so yesterday = day before yesterday's cycle to yesterday's cycle
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const dayBeforeYesterday = new Date(now);
+      dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
+      
+      startOfRange = applyReportCycleTime(dayBeforeYesterday);
+      endOfRange = applyReportCycleTime(yesterday);
     }
+    
+    // Validate that start is not after end
+    if (startOfRange > endOfRange) {
+      console.warn('Invalid date range: start date is after end date');
+      return;
+    }
+
+    onDateRangeChange({
+      from: startOfRange,
+      to: endOfRange
+    });
     setIsOpen(false);
   };
 
