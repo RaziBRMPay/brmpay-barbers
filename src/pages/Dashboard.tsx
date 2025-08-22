@@ -83,8 +83,28 @@ const Dashboard = () => {
 
   const generateReport = async () => {
     if (!dateRange?.from || !dateRange?.to || !merchantData) {
+      toast({
+        title: "Invalid Selection",
+        description: "Please select a valid date range",
+        variant: "destructive",
+      });
       return;
     }
+
+    // Validate date range
+    if (dateRange.from > dateRange.to) {
+      toast({
+        title: "Invalid Date Range",
+        description: "Start date cannot be after end date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Generating report for date range:', {
+      from: dateRange.from.toISOString(),
+      to: dateRange.to.toISOString()
+    });
 
     setLoading(true);
     try {

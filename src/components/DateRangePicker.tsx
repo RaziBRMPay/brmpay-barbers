@@ -56,17 +56,40 @@ export function DateRangePicker({
       adjustedRange.to = applyReportCycleTime(range.to);
     }
 
+    // Validate date range
+    if (adjustedRange.from && adjustedRange.to && adjustedRange.from > adjustedRange.to) {
+      console.warn('Invalid date range: start date is after end date');
+      return;
+    }
+
     onDateRangeChange(adjustedRange);
   };
 
   // Preset: Today
   const selectToday = () => {
-    const today = new Date();
-    const startOfCycle = applyReportCycleTime(today);
     const now = new Date();
+    const todayReportCycle = applyReportCycleTime(new Date());
+    
+    let startOfRange: Date;
+    
+    // If current time is after today's report cycle time, use today's cycle
+    // If current time is before today's report cycle time, use yesterday's cycle
+    if (now >= todayReportCycle) {
+      startOfRange = todayReportCycle;
+    } else {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      startOfRange = applyReportCycleTime(yesterday);
+    }
+    
+    // Validate that start is not after end
+    if (startOfRange > now) {
+      console.warn('Invalid date range: start date is after end date');
+      return;
+    }
 
     onDateRangeChange({
-      from: startOfCycle,
+      from: startOfRange,
       to: now
     });
     setIsOpen(false);
