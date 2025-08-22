@@ -222,7 +222,7 @@ const Dashboard = () => {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-commission-report', {
+      const { data, error } = await supabase.functions.invoke('email-commission-report', {
         body: {
           merchantId: merchantData.id,
           salesData: salesData,
