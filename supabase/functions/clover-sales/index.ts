@@ -79,8 +79,6 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { merchantId, startDate, endDate }: CloverSalesRequest = requestBody;
-
     console.log('Fetching sales data for merchant:', merchantId, 'from', startDate, 'to', endDate);
 
     // Get merchant's Clover API credentials from secure storage
