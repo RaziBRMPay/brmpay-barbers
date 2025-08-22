@@ -45,6 +45,51 @@ const Dashboard = () => {
     }
   }, [profile]);
 
+  // Auto-select "Today" on component mount
+  useEffect(() => {
+    if (settings?.report_time_cycle && !dateRange) {
+      selectTodayInitial();
+    }
+  }, [settings, dateRange]);
+
+  const selectTodayInitial = () => {
+    const now = new Date();
+    const reportCycleTime = settings?.report_time_cycle || "21:00:00";
+    
+    // Parse report cycle time
+    const [hours, minutes, seconds] = reportCycleTime.split(':').map(Number);
+    
+    // Create today's report cycle time
+    const todayReportCycle = new Date(now);
+    todayReportCycle.setHours(hours, minutes, seconds || 0, 0);
+    
+    let startOfRange: Date;
+    let endOfRange: Date;
+    
+    // If current time is after today's report cycle time, today = today's cycle to tomorrow's cycle
+    // If current time is before today's report cycle time, today = yesterday's cycle to today's cycle
+    if (now >= todayReportCycle) {
+      // Today's cycle has started
+      startOfRange = todayReportCycle;
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(hours, minutes, seconds || 0, 0);
+      endOfRange = tomorrow;
+    } else {
+      // Today's cycle hasn't started yet
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(hours, minutes, seconds || 0, 0);
+      startOfRange = yesterday;
+      endOfRange = todayReportCycle;
+    }
+    
+    setDateRange({
+      from: startOfRange,
+      to: endOfRange
+    });
+  };
+
   const fetchMerchantData = async () => {
     try {
       // Fetch merchant data

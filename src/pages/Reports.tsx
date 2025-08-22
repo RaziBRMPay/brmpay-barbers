@@ -207,18 +207,11 @@ const Reports = () => {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            <span>
-                              Report Period: {(() => {
-                                const reportDate = new Date(report.report_date);
-                                const createdAt = new Date(report.created_at);
-                                // Format as MM/DD/YYYY HH:MM - MM/DD/YYYY HH:MM
-                                const startFormat = format(reportDate, 'MM/dd/yyyy HH:mm');
-                                const endFormat = format(createdAt, 'MM/dd/yyyy HH:mm');
-                                return `${startFormat} - ${endFormat}`;
-                              })()}
-                            </span>
+                          <span>
+                               Report Date: {format(new Date(report.report_date), 'MM/dd/yyyy')}
+                             </span>
                           </div>
-                          <span>Generated: {format(new Date(report.created_at), 'MM/dd/yyyy HH:mm')}</span>
+                           <span>Generated: {format(new Date(report.created_at), 'MM/dd/yyyy HH:mm')}</span>
                         </div>
                       </div>
                     </div>
