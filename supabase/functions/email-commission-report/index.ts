@@ -74,7 +74,10 @@ const handler = async (req: Request): Promise<Response> => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Parse request body
-    const { merchantId, salesData, dateRange }: EmailReportRequest = await req.json();
+    const requestBody = await req.text();
+    console.log('Raw request body:', requestBody);
+    
+    const { merchantId, salesData, dateRange }: EmailReportRequest = JSON.parse(requestBody);
     
     console.log('Processing request:', {
       merchantId,

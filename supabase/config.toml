@@ -55,5 +55,5 @@ verify_jwt = true
 [functions.generate-pdf-report]
 verify_jwt = false
 
-[functions.send-commission-report]
+[functions.email-commission-report]
 verify_jwt = false
