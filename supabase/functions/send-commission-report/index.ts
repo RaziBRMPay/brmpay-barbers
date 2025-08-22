@@ -40,19 +40,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Sending commission report for merchant:', merchantId);
 
-    // Get merchant details and user email
+    // Get merchant details first
+    console.log('Fetching merchant data...');
     const { data: merchant, error: merchantError } = await supabase
       .from('merchants')
-      .select(`
-        shop_name,
-        timezone,
-        user_id,
-        profiles!user_id (
-          email,
-          first_name,
-          last_name
-        )
-      `)
+      .select('shop_name, timezone, user_id')
       .eq('id', merchantId)
       .single();
 
@@ -64,10 +56,42 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const userEmail = merchant.profiles.email;
-    const userName = merchant.profiles.first_name 
-      ? `${merchant.profiles.first_name} ${merchant.profiles.last_name || ''}`.trim()
+    console.log('Merchant data:', merchant);
+
+    // Get user profile separately
+    console.log('Fetching user profile for user_id:', merchant.user_id);
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('email, first_name, last_name')
+      .eq('id', merchant.user_id)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('Error fetching profile:', profileError);
+      return new Response(JSON.stringify({ error: 'User profile not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('Profile data:', profile);
+
+    // Validate required data
+    if (!profile.email) {
+      console.error('No email found for user profile');
+      return new Response(JSON.stringify({ error: 'User email not found' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const userEmail = profile.email;
+    const userName = profile.first_name 
+      ? `${profile.first_name} ${profile.last_name || ''}`.trim()
       : userEmail;
+
+    console.log('Email will be sent to:', userEmail);
+    console.log('User name for greeting:', userName);
 
     // Calculate totals
     const totalSales = salesData.reduce((sum, emp) => sum + emp.total_sales, 0);
