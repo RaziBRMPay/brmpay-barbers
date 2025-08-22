@@ -73,18 +73,23 @@ const handler = async (req: Request): Promise<Response> => {
     const totalSales = salesData.reduce((sum, emp) => sum + emp.total_sales, 0);
     const totalCommissions = salesData.reduce((sum, emp) => sum + emp.commission_amount, 0);
 
-    // Format date range
-    const formatDate = (dateStr: string) => {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
+    // Format date range in MM/DD/YYYY HH:MM format
+    const formatDateTime = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric'
+      }) + ' ' + date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
       });
     };
 
     const dateRangeText = dateRange.from === dateRange.to 
-      ? formatDate(dateRange.from)
-      : `${formatDate(dateRange.from)} - ${formatDate(dateRange.to)}`;
+      ? formatDateTime(dateRange.from)
+      : `${formatDateTime(dateRange.from)} - ${formatDateTime(dateRange.to)}`;
 
     // Generate HTML table for employee data
     const employeeRows = salesData
@@ -152,11 +157,13 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="background: #f8fafc; border-radius: 12px; padding: 20px; text-align: center;">
             <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px;">
               Generated on ${new Date().toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit'
+                month: '2-digit',
+                day: '2-digit',
+                year: 'numeric'
+              })} ${new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
               })}
             </p>
             <p style="margin: 0; color: #9ca3af; font-size: 12px;">
