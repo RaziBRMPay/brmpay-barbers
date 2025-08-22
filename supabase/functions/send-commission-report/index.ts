@@ -2,15 +2,9 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.55.0';
 import { Resend } from "npm:resend@2.0.0";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'X-XSS-Protection': '1; mode=block',
-  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 };
 
 interface CommissionReportRequest {
@@ -27,16 +21,79 @@ interface CommissionReportRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests FIRST
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Handling CORS preflight request');
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    console.log('=== Commission Report Email Function Started ===');
+    console.log('Request method:', req.method);
+    
+    // Validate environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
-    const { merchantId, salesData, dateRange }: CommissionReportRequest = await req.json();
+    console.log('Environment check:', {
+      supabaseUrl: supabaseUrl ? 'present' : 'MISSING',
+      supabaseKey: supabaseKey ? 'present' : 'MISSING',
+      resendApiKey: resendApiKey ? 'present' : 'MISSING'
+    });
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing Supabase environment variables');
+      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!resendApiKey) {
+      console.error('RESEND_API_KEY is missing or undefined');
+      return new Response(JSON.stringify({ error: 'Email service not configured - missing RESEND_API_KEY' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('All environment variables validated successfully');
+
+    // Initialize Resend with error handling
+    let resend;
+    try {
+      resend = new Resend(resendApiKey);
+      console.log('Resend client initialized successfully');
+    } catch (resendError) {
+      console.error('Failed to initialize Resend client:', resendError);
+      return new Response(JSON.stringify({ error: 'Email service initialization failed' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    console.log('Supabase client initialized');
+
+    // Parse request body
+    let requestData;
+    try {
+      requestData = await req.json();
+      console.log('Request data parsed successfully');
+    } catch (parseError) {
+      console.error('Failed to parse request JSON:', parseError);
+      return new Response(JSON.stringify({ error: 'Invalid JSON in request body' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { merchantId, salesData, dateRange }: CommissionReportRequest = requestData;
 
     console.log('Sending commission report for merchant:', merchantId);
 
@@ -200,14 +257,37 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     // Send email via Resend
-    const emailResponse = await resend.emails.send({
+    console.log('Attempting to send email...');
+    console.log('Email details:', {
       from: "Clover Barber Boost <onboarding@resend.dev>",
       to: [userEmail],
-      subject: `📊 Commission Report - ${merchant.shop_name} (${dateRangeText})`,
-      html: emailHtml,
+      subject: `📊 Commission Report - ${merchant.shop_name} (${dateRangeText})`
     });
-
-    console.log('Email sent successfully:', emailResponse);
+    
+    let emailResponse;
+    try {
+      emailResponse = await resend.emails.send({
+        from: "Clover Barber Boost <onboarding@resend.dev>",
+        to: [userEmail],
+        subject: `📊 Commission Report - ${merchant.shop_name} (${dateRangeText})`,
+        html: emailHtml,
+      });
+      console.log('Email sent successfully:', emailResponse);
+    } catch (emailError) {
+      console.error('Failed to send email via Resend:', emailError);
+      console.error('Email error details:', {
+        message: emailError.message,
+        stack: emailError.stack,
+        name: emailError.name
+      });
+      return new Response(JSON.stringify({ 
+        error: 'Failed to send email',
+        details: emailError.message 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({ 
       success: true,
