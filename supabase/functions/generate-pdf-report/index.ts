@@ -12,8 +12,11 @@ const corsHeaders = {
 
 interface ReportRequest {
   merchantId: string;
-  reportDate: string;
+  startDateTime?: string;
+  endDateTime?: string;
+  reportDate?: string; // Keep for backward compatibility
   reportType?: string;
+  businessDayEnd?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -31,23 +34,56 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { merchantId, reportDate, reportType = 'daily_sales' }: ReportRequest = await req.json();
+    const requestBody = await req.json();
+    const { 
+      merchantId, 
+      startDateTime, 
+      endDateTime, 
+      reportDate, 
+      reportType = 'daily_sales',
+      businessDayEnd
+    } = requestBody as ReportRequest;
 
-    console.log(`Generating PDF report for merchant: ${merchantId}, date: ${reportDate}`);
-
-    // Fetch sales data for the report date
-    const { data: salesData, error: salesError } = await supabaseClient
+    // Use datetime range if provided, otherwise fall back to date-based query
+    let salesQuery = supabaseClient
       .from('employee_sales_data')
       .select(`
         employee_id,
         employee_name,
         total_sales,
         commission_amount,
-        sales_date
+        sales_date,
+        created_at
       `)
-      .eq('merchant_id', merchantId)
-      .eq('sales_date', reportDate)
-      .order('total_sales', { ascending: false });
+      .eq('merchant_id', merchantId);
+
+    let periodDescription: string;
+    let actualReportDate: string;
+    
+    if (startDateTime && endDateTime) {
+      console.log(`Generating report for merchant ${merchantId} for period ${startDateTime} to ${endDateTime}`);
+      
+      // Use datetime range for precise querying
+      salesQuery = salesQuery
+        .gte('created_at', startDateTime)
+        .lt('created_at', endDateTime);
+        
+      const startDate = new Date(startDateTime);
+      const endDate = new Date(endDateTime);
+      periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
+      actualReportDate = businessDayEnd ? businessDayEnd.split('T')[0] : endDateTime.split('T')[0];
+    } else if (reportDate) {
+      console.log(`Generating report for merchant ${merchantId} for date ${reportDate}`);
+      
+      // Fall back to date-based query for backward compatibility
+      salesQuery = salesQuery.eq('sales_date', reportDate);
+      periodDescription = new Date(reportDate).toLocaleDateString();
+      actualReportDate = reportDate;
+    } else {
+      throw new Error('Either startDateTime/endDateTime or reportDate must be provided');
+    }
+
+    const { data: salesData, error: salesError } = await salesQuery.order('total_sales', { ascending: false });
 
     if (salesError) {
       console.error('Error fetching sales data:', salesError);
@@ -74,13 +110,16 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate simple HTML report (in a real implementation, you'd use a PDF library)
     const reportData = {
       merchantName: merchantData?.shop_name || 'Unknown Shop',
-      reportDate,
+      reportDate: actualReportDate,
+      periodDescription,
       reportType,
       totalSales,
       totalCommission,
       shopCommission,
       employees: salesData || [],
-      generatedAt: new Date().toISOString()
+      generatedAt: new Date().toISOString(),
+      startDateTime,
+      endDateTime
     };
 
     // Create a simple HTML report content
@@ -92,18 +131,25 @@ const handler = async (req: Request): Promise<Response> => {
     // 3. Store the file URL in the reports table
     
     // For now, we'll just store the report data in the database
-    const fileName = `${merchantData?.shop_name}-${reportDate}-${reportType}.pdf`;
+    const fileName = `${merchantData?.shop_name}-${actualReportDate}-${reportType}.pdf`;
     
+    const reportInsertData: any = {
+      merchant_id: merchantId,
+      report_date: actualReportDate,
+      report_type: reportType,
+      file_name: fileName,
+      file_url: null, // Would be set after PDF upload
+      report_data: {
+        ...reportData,
+        periodDescription,
+        startDateTime,
+        endDateTime
+      }
+    };
+
     const { data: reportRecord, error: reportError } = await supabaseClient
       .from('reports')
-      .upsert({
-        merchant_id: merchantId,
-        report_date: reportDate,
-        report_type: reportType,
-        file_name: fileName,
-        file_url: null, // Would be set after PDF upload
-        report_data: reportData
-      }, {
+      .upsert(reportInsertData, {
         onConflict: 'merchant_id,report_date,report_type'
       })
       .select()
@@ -423,7 +469,7 @@ function generateHTMLReport(data: any): string {
             <svg class="meta-icon" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
             </svg>
-            <span>Report Period: ${formatDateTime(data.reportDate)}</span>
+            <span>Report Period: ${data.periodDescription || formatDateTime(data.reportDate)}</span>
           </div>
           <div class="meta-item">
             <svg class="meta-icon" fill="currentColor" viewBox="0 0 20 20">

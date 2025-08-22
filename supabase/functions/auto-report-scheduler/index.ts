@@ -24,14 +24,10 @@ const handler = async (req: Request): Promise<Response> => {
     // Get current time
     const now = new Date();
     const currentTime = now.toTimeString().slice(0, 8); // HH:MM:SS format
-    const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayDate = yesterday.toISOString().split('T')[0];
 
-    console.log(`Checking for merchants with report time around ${currentTime}`);
+    console.log(`Checking for merchants with exact report time: ${currentTime}`);
 
-    // Find merchants whose report_time_cycle matches current time (within 5 minutes)
+    // Find merchants whose report_time_cycle exactly matches current time
     const { data: settings, error: settingsError } = await supabaseClient
       .from('settings')
       .select(`
@@ -55,18 +51,45 @@ const handler = async (req: Request): Promise<Response> => {
       const reportTime = setting.report_time_cycle;
       const merchantId = setting.merchant_id;
       const merchantName = setting.merchants.shop_name;
+      const merchantTimezone = setting.merchants.timezone;
+      const lastCompletedTime = setting.last_completed_report_cycle_time;
 
-      // Check if current time is within 5 minutes of report time
+      // Check if current time exactly matches report time
       if (isTimeToGenerateReport(currentTime, reportTime)) {
-        console.log(`Generating report for merchant: ${merchantName} (${merchantId})`);
+        console.log(`Checking report generation for merchant: ${merchantName} (${merchantId})`);
+        
+        // Calculate the business day period that just ended
+        const businessDayEnd = new Date(now);
+        const businessDayStart = new Date(now);
+        businessDayStart.setDate(businessDayStart.getDate() - 1);
+        
+        // Set the exact times based on report_time_cycle
+        const [hours, minutes, seconds] = reportTime.split(':').map(Number);
+        businessDayEnd.setHours(hours, minutes, seconds, 999); // End at HH:MM:SS.999
+        businessDayStart.setHours(hours, minutes, seconds, 0); // Start at HH:MM:SS.000
+        
+        const startDateTime = businessDayStart.toISOString();
+        const endDateTime = businessDayEnd.toISOString();
+
+        // Check if we already generated a report for this business period
+        const businessDayEndTime = businessDayEnd.toISOString();
+        
+        if (lastCompletedTime && new Date(lastCompletedTime) >= businessDayEnd) {
+          console.log(`Report already generated for business period ending at ${businessDayEndTime} for merchant ${merchantName}`);
+          continue;
+        }
+
+        console.log(`Generating report for merchant: ${merchantName} - Period: ${startDateTime} to ${endDateTime}`);
 
         try {
-          // Generate PDF report for yesterday's data
+          // Generate PDF report for the business day period that just ended
           const reportResponse = await supabaseClient.functions.invoke('generate-pdf-report', {
             body: {
               merchantId,
-              reportDate: yesterdayDate,
-              reportType: 'daily_sales'
+              startDateTime,
+              endDateTime,
+              reportType: 'daily_sales',
+              businessDayEnd: businessDayEndTime
             }
           });
 
@@ -81,11 +104,11 @@ const handler = async (req: Request): Promise<Response> => {
           } else {
             console.log(`Report generated successfully for ${merchantName}`);
             
-            // Update last_completed_report_cycle_time
+            // Update last_completed_report_cycle_time to the business day end time
             await supabaseClient
               .from('settings')
               .update({
-                last_completed_report_cycle_time: now.toISOString()
+                last_completed_report_cycle_time: businessDayEndTime
               })
               .eq('merchant_id', merchantId);
 
@@ -93,6 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
               merchantId,
               merchantName,
               success: true,
+              businessPeriod: `${startDateTime} to ${endDateTime}`,
               reportData: reportResponse.data
             });
             processedReports++;
@@ -146,15 +170,12 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 function isTimeToGenerateReport(currentTime: string, reportTime: string): boolean {
+  // Extract time components
   const [currentH, currentM, currentS] = currentTime.split(':').map(Number);
   const [reportH, reportM, reportS] = reportTime.split(':').map(Number);
 
-  const currentMinutes = currentH * 60 + currentM;
-  const reportMinutes = reportH * 60 + reportM;
-
-  // Check if current time is within 5 minutes of report time
-  const diff = Math.abs(currentMinutes - reportMinutes);
-  return diff <= 5;
+  // Check for exact time match (HH:MM:SS)
+  return currentH === reportH && currentM === reportM && currentS === reportS;
 }
 
 serve(handler);
