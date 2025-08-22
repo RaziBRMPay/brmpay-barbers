@@ -47,7 +47,7 @@ const handler = async (req: Request): Promise<Response> => {
         shop_name,
         timezone,
         user_id,
-        profiles (
+        profiles!user_id (
           email,
           first_name,
           last_name
