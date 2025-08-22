@@ -55,7 +55,7 @@ const SubAdminDashboard = () => {
             shop_name,
             timezone,
             user_id,
-            profiles (
+            profiles!user_id (
               email
             ),
             settings (

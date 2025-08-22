@@ -177,7 +177,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email via Resend
     const emailResponse = await resend.emails.send({
-      from: "Clover Barber Boost <reports@yourdomain.com>",
+      from: "Clover Barber Boost <onboarding@resend.dev>",
       to: [userEmail],
       subject: `📊 Commission Report - ${merchant.shop_name} (${dateRangeText})`,
       html: emailHtml,
