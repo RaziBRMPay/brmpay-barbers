@@ -31,18 +31,32 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('=== Commission Report Email Function Started ===');
+    console.log('=== Commission Report Email Function Started (v2.0) ===');
     console.log('Request method:', req.method);
+    console.log('Timestamp:', new Date().toISOString());
     
-    // Validate environment variables
+    // Comprehensive environment variable debugging
+    console.log('=== DEBUGGING ALL ENVIRONMENT VARIABLES ===');
+    const allEnvVars = Object.keys(Deno.env.toObject());
+    console.log('Available env vars:', allEnvVars.sort());
+    
+    // Try multiple ways to access the RESEND_API_KEY
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    const resendApiKeyAlt = Deno.env.toObject()['RESEND_API_KEY'];
+    
+    console.log('RESEND_API_KEY access methods:');
+    console.log('- Deno.env.get("RESEND_API_KEY"):', resendApiKey ? `present (${resendApiKey.length} chars)` : 'MISSING');
+    console.log('- Deno.env.toObject()["RESEND_API_KEY"]:', resendApiKeyAlt ? `present (${resendApiKeyAlt.length} chars)` : 'MISSING');
+    
+    // Validate other environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
 
-    console.log('Environment check:', {
-      supabaseUrl: supabaseUrl ? 'present' : 'MISSING',
-      supabaseKey: supabaseKey ? 'present' : 'MISSING',
-      resendApiKey: resendApiKey ? 'present' : 'MISSING'
+    console.log('Environment check (detailed):', {
+      supabaseUrl: supabaseUrl ? `present (${supabaseUrl.length} chars)` : 'MISSING',
+      supabaseKey: supabaseKey ? `present (${supabaseKey.length} chars)` : 'MISSING',
+      resendApiKey: resendApiKey ? `present (${resendApiKey.length} chars)` : 'MISSING',
+      resendApiKeyAlt: resendApiKeyAlt ? `present (${resendApiKeyAlt.length} chars)` : 'MISSING'
     });
 
     if (!supabaseUrl || !supabaseKey) {
