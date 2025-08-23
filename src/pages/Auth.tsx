@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Scissors, BarChart3 } from 'lucide-react';
 
 const Auth = () => {
-  const { user, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -19,7 +19,8 @@ const Auth = () => {
     password: ''
   });
 
-  if (user) {
+  // Don't redirect while still loading to avoid infinite loop
+  if (user && !loading) {
     return <Navigate to="/" replace />;
   }
 
