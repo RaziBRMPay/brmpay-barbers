@@ -179,39 +179,54 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Found orders:', orders.length);
 
-    // Calculate sales by employee
-    const salesByEmployee = new Map<string, { 
-      name: string, 
+    // Calculate sales by employee and date
+    const salesByEmployeeAndDate = new Map<string, { 
+      employeeId: string,
+      employeeName: string,
+      salesDate: string,
       totalSales: number, 
       orderCount: number 
     }>();
 
-    // Initialize all employees with zero sales
-    employees.forEach(employee => {
-      salesByEmployee.set(employee.id, {
-        name: employee.name,
-        totalSales: 0,
-        orderCount: 0
-      });
-    });
-
-    // Process orders and calculate sales
+    // Process orders and calculate sales by employee and date
     orders.forEach(order => {
-      if (order.employee && order.employee.id) {
+      if (order.employee && order.employee.id && order.created) {
         const employeeId = order.employee.id;
-        const current = salesByEmployee.get(employeeId);
+        const employeeName = order.employee.name || 'Unknown Employee';
+        
+        // Convert Unix timestamp to date string (YYYY-MM-DD)
+        const orderDate = new Date(order.created).toISOString().split('T')[0];
+        const key = `${employeeId}-${orderDate}`;
+        
+        const current = salesByEmployeeAndDate.get(key);
         
         if (current) {
           current.totalSales += order.total || 0;
           current.orderCount += 1;
         } else {
-          // Employee not found in employees list, add them
-          salesByEmployee.set(employeeId, {
-            name: order.employee.name || 'Unknown Employee',
+          salesByEmployeeAndDate.set(key, {
+            employeeId,
+            employeeName,
+            salesDate: orderDate,
             totalSales: order.total || 0,
             orderCount: 1
           });
         }
+      }
+    });
+
+    // Add zero-sales entries for employees with no sales on any day in the range
+    // (Only for the start date to avoid cluttering the database)
+    employees.forEach(employee => {
+      const startDateKey = `${employee.id}-${new Date(startDate).toISOString().split('T')[0]}`;
+      if (!salesByEmployeeAndDate.has(startDateKey)) {
+        salesByEmployeeAndDate.set(startDateKey, {
+          employeeId: employee.id,
+          employeeName: employee.name,
+          salesDate: new Date(startDate).toISOString().split('T')[0],
+          totalSales: 0,
+          orderCount: 0
+        });
       }
     });
 
@@ -236,14 +251,15 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     // Convert to array and calculate commissions using individual rates
-    const salesData = Array.from(salesByEmployee.entries()).map(([employeeId, data]) => {
-      const commissionRate = employeeCommissionMap.get(employeeId) || defaultCommissionRate;
+    const salesData = Array.from(salesByEmployeeAndDate.values()).map((data) => {
+      const commissionRate = employeeCommissionMap.get(data.employeeId) || defaultCommissionRate;
       const totalSales = data.totalSales / 100; // Convert from cents to dollars
       const commissionAmount = totalSales * commissionRate;
       
       return {
-        employee_id: employeeId,
-        employee_name: data.name,
+        employee_id: data.employeeId,
+        employee_name: data.employeeName,
+        sales_date: data.salesDate,
         total_sales: totalSales,
         order_count: data.orderCount,
         commission_amount: commissionAmount,
@@ -256,7 +272,7 @@ const handler = async (req: Request): Promise<Response> => {
       merchant_id: merchantId,
       employee_id: data.employee_id,
       employee_name: data.employee_name,
-      sales_date: new Date(startDate).toISOString().split('T')[0],
+      sales_date: data.sales_date, // Use actual sales date instead of start date
       total_sales: data.total_sales,
       commission_amount: data.commission_amount,
     }));
