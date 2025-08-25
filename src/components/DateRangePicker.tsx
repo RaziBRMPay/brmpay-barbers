@@ -46,14 +46,15 @@ export function DateRangePicker({
 
     let adjustedRange: DateRange = { from: undefined, to: undefined };
 
-    // Apply report cycle time to start date
+    // For manual date selection, use full day ranges for better data coverage
     if (range.from) {
-      adjustedRange.from = applyReportCycleTime(range.from);
+      // Start from beginning of the day (00:00:00)
+      adjustedRange.from = setSeconds(setMinutes(setHours(range.from, 0), 0), 0);
     }
 
-    // Apply report cycle time to end date
     if (range.to) {
-      adjustedRange.to = applyReportCycleTime(range.to);
+      // End at the end of the day (23:59:59)
+      adjustedRange.to = setSeconds(setMinutes(setHours(range.to, 23), 59), 59);
     }
 
     // Validate date range
