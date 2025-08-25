@@ -28,18 +28,23 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('Email Commission Report Function Started');
+    console.log('Email Commission Report Function Started - v2.0');
     
     // Get environment variables
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
+    // Enhanced logging for debugging
     console.log('Environment check:', {
-      resendApiKey: resendApiKey ? 'present' : 'MISSING',
+      resendApiKey: resendApiKey ? `present (${resendApiKey.substring(0, 8)}...)` : 'MISSING',
       supabaseUrl: supabaseUrl ? 'present' : 'MISSING',
       supabaseKey: supabaseKey ? 'present' : 'MISSING'
     });
+
+    console.log('All environment variables:', Object.keys(Deno.env.toObject()).filter(key => 
+      key.includes('RESEND') || key.includes('SUPABASE')
+    ));
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY is missing');
