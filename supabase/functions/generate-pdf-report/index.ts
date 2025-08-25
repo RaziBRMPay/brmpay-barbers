@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
+import { PDF } from "https://deno.land/x/pdfgen@v0.1.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -125,20 +127,16 @@ const handler = async (req: Request): Promise<Response> => {
     // Create a simple HTML report content
     const htmlContent = generateHTMLReport(reportData);
     
-    // In a real implementation, you would:
-    // 1. Convert HTML to PDF using a library like Puppeteer or jsPDF
-    // 2. Upload the PDF to Supabase Storage
-    // 3. Store the file URL in the reports table
+    // Generate PDF from HTML
+    const fileName = `${merchantData?.shop_name.replace(/[^a-zA-Z0-9]/g, '_')}-${actualReportDate}-${reportType}.pdf`;
+    const filePath = `${merchantId}/${fileName}`;
     
-    // For now, we'll just store the report data in the database
-    const fileName = `${merchantData?.shop_name}-${actualReportDate}-${reportType}.pdf`;
-    
-    const reportInsertData: any = {
+    let reportInsertData: any = {
       merchant_id: merchantId,
       report_date: actualReportDate,
       report_type: reportType,
       file_name: fileName,
-      file_url: null, // Would be set after PDF upload
+      file_url: null,
       report_data: {
         ...reportData,
         periodDescription,
@@ -146,6 +144,65 @@ const handler = async (req: Request): Promise<Response> => {
         endDateTime
       }
     };
+    
+    try {
+      // Create PDF from HTML (simplified approach - in production you'd use better HTML-to-PDF conversion)
+      const pdf = new PDF({ size: "A4", margin: { top: 40, bottom: 40, left: 40, right: 40 } });
+      
+      // Add content to PDF (this is a basic implementation)
+      pdf.text(`${merchantData?.shop_name} - Daily Sales Report`, { fontSize: 20, align: "center" });
+      pdf.text(`Report Date: ${actualReportDate}`, { fontSize: 12, y: 80 });
+      pdf.text(`Period: ${reportData.periodDescription}`, { fontSize: 12, y: 100 });
+      pdf.text(`Total Sales: $${reportData.totalSales.toFixed(2)}`, { fontSize: 14, y: 140 });
+      pdf.text(`Total Commission: $${reportData.totalCommission.toFixed(2)}`, { fontSize: 14, y: 160 });
+      pdf.text(`Shop Commission: $${reportData.shopCommission.toFixed(2)}`, { fontSize: 14, y: 180 });
+      
+      // Add employee data
+      let yPos = 220;
+      pdf.text("Employee Performance:", { fontSize: 16, y: yPos });
+      yPos += 30;
+      
+      for (const employee of reportData.employees) {
+        if (yPos > 700) { // Add new page if needed
+          pdf.addPage();
+          yPos = 50;
+        }
+        pdf.text(`${employee.employee_name} (${employee.employee_id})`, { fontSize: 12, y: yPos });
+        pdf.text(`Sales: $${employee.total_sales.toFixed(2)} | Commission: $${employee.commission_amount.toFixed(2)}`, { fontSize: 10, y: yPos + 15 });
+        yPos += 40;
+      }
+      
+      const pdfBytes = await pdf.save();
+      
+      // Upload PDF to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabaseClient.storage
+        .from('reports')
+        .upload(filePath, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Error uploading PDF to storage:', uploadError);
+        throw new Error(`Failed to upload PDF: ${uploadError.message}`);
+      }
+
+      // Get public URL for the uploaded file
+      const { data: publicUrlData } = supabaseClient.storage
+        .from('reports')
+        .getPublicUrl(filePath);
+
+      const fileUrl = publicUrlData.publicUrl;
+      
+      console.log('PDF generated and uploaded successfully:', fileUrl);
+      
+      // Update report data with file URL
+      reportInsertData.file_url = fileUrl;
+      
+    } catch (pdfError) {
+      console.error('Error generating PDF:', pdfError);
+      // Fallback - reportInsertData already has file_url: null
+    }
 
     const { data: reportRecord, error: reportError } = await supabaseClient
       .from('reports')

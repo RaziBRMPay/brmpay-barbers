@@ -96,8 +96,17 @@ const Reports = () => {
     }
 
     try {
-      // In a real implementation, you would handle the file download here
-      // For now, we'll just show a message
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = report.file_url;
+      link.download = report.file_name || 'report.pdf';
+      link.target = '_blank';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
       toast({
         title: 'Download Started',
         description: `Downloading ${report.file_name || 'report.pdf'}`,
