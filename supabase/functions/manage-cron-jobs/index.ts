@@ -190,17 +190,35 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
     const reportTime = settings.report_time_cycle;
     const cronExpression = convertToCronExpression(reportTime, timezone);
     
-    // Calculate next run time properly accounting for DST
+    // Calculate next run time in the merchant's local timezone
     const [hours, minutes] = reportTime.split(':').map(Number);
     const now = new Date();
     
-    // Create a date for today at the report time
-    const nextRun = new Date();
-    nextRun.setHours(hours, minutes, 0, 0);
+    // Get the current timezone offset for DST handling
+    const timezoneOffset = getTimezoneOffset(timezone, now);
     
-    // If the time has passed today, move to tomorrow
-    if (nextRun <= now) {
-      nextRun.setDate(nextRun.getDate() + 1);
+    // Create a date representing the report time in the merchant's timezone
+    // We need to create a UTC time that, when converted to the merchant's timezone, shows the correct local time
+    const nextRun = new Date();
+    
+    // Set the UTC time such that when converted to the merchant's timezone, it shows the desired local time
+    // If we want 9 PM Eastern (UTC-4), we need to set UTC to 1 AM next day (9 PM + 4 hours)
+    nextRun.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
+    
+    // If the local time has passed today, move to tomorrow
+    const localTime = new Date();
+    localTime.setHours(hours, minutes, 0, 0);
+    
+    if (localTime <= now) {
+      nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+    }
+    
+    // For display purposes, we want to show the local time (not UTC time)
+    // Create a display time that represents the local time
+    const displayTime = new Date();
+    displayTime.setHours(hours, minutes, 0, 0);
+    if (displayTime <= now) {
+      displayTime.setDate(displayTime.getDate() + 1);
     }
 
     return new Response(
@@ -210,7 +228,7 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
           jobName,
           cronExpression,
           isConfigured: true,
-          nextRunTime: nextRun.toISOString(),
+          nextRunTime: displayTime.toISOString(),
           lastCompletedRun: settings.last_completed_report_cycle_time,
           reportTime: reportTime,
           timezone: timezone,
