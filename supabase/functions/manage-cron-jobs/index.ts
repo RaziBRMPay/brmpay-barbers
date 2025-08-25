@@ -172,14 +172,24 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
     const reportTime = settings.report_time_cycle;
     const cronExpression = convertToCronExpression(reportTime, timezone);
     
-    // Calculate next run time
+    // Calculate next run time in the merchant's local timezone
     const [hours, minutes] = reportTime.split(':').map(Number);
-    const nextRun = new Date();
-    nextRun.setHours(hours, minutes, 0, 0);
+    const timezoneOffset = TIMEZONE_OFFSETS[timezone as keyof typeof TIMEZONE_OFFSETS] || -5;
     
-    // If time has passed today, schedule for tomorrow
-    if (nextRun <= new Date()) {
-      nextRun.setDate(nextRun.getDate() + 1);
+    // Create date for today at the report time in local timezone
+    const now = new Date();
+    const localNow = new Date(now.getTime() + (timezoneOffset * 60 * 60 * 1000));
+    
+    const nextRun = new Date();
+    // Set the time in local timezone by adjusting for the offset
+    nextRun.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
+    
+    // If time has passed today in local timezone, schedule for tomorrow
+    const localReportTime = new Date();
+    localReportTime.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
+    
+    if (localReportTime <= now) {
+      nextRun.setUTCDate(nextRun.getUTCDate() + 1);
     }
 
     return new Response(
