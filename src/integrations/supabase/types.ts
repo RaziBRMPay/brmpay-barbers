@@ -390,6 +390,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_cron_job: {
+        Args: { cron_expression: string; job_name: string; merchant_id: string }
+        Returns: undefined
+      }
+      delete_cron_job: {
+        Args: { job_name: string }
+        Returns: undefined
+      }
       log_security_event: {
         Args: {
           p_action: string
@@ -400,6 +408,15 @@ export type Database = {
           p_success?: boolean
         }
         Returns: undefined
+      }
+      setup_all_merchant_cron_jobs: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          merchant_id: string
+          message: string
+          shop_name: string
+          success: boolean
+        }[]
       }
       validate_merchant_access: {
         Args: { target_merchant_id: string }
