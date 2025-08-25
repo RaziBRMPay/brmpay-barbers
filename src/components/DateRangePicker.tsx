@@ -189,66 +189,81 @@ export function DateRangePicker({
           <Button
             variant="outline"
             className={cn(
-              "justify-start text-left font-normal min-w-[280px]",
+              "justify-start text-left font-normal min-w-[320px] h-12 px-4 border-2 hover:border-primary/20 transition-all duration-200",
               !dateRange && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {getDisplayText()}
+            <CalendarIcon className="mr-3 h-5 w-5 text-primary" />
+            <div className="flex flex-col items-start">
+              <span className="font-medium">{getDisplayText()}</span>
+              {getTimeDisplay() && (
+                <span className="text-xs text-muted-foreground mt-0.5">
+                  {getTimeDisplay()}
+                </span>
+              )}
+            </div>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <div className="p-4 border-b space-y-2">
-            <h4 className="font-medium text-sm">Quick Select</h4>
-            <div className="flex gap-2">
+        <PopoverContent className="w-auto p-0 shadow-lg border-2" align="start">
+          <div className="p-6 border-b bg-gradient-to-r from-background to-muted/20">
+            <h4 className="font-semibold text-base mb-4 text-foreground">Quick Select</h4>
+            <div className="grid grid-cols-3 gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={selectToday}
-                className="flex-1"
+                className="h-10 bg-background hover:bg-primary hover:text-primary-foreground transition-all duration-200 border border-border hover:border-primary font-medium"
               >
                 Today
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={selectYesterday}
-                className="flex-1"
+                className="h-10 bg-background hover:bg-primary hover:text-primary-foreground transition-all duration-200 border border-border hover:border-primary font-medium"
               >
                 Yesterday
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={selectThisMonth}
-                className="flex-1"
+                className="h-10 bg-background hover:bg-primary hover:text-primary-foreground transition-all duration-200 border border-border hover:border-primary font-medium"
               >
                 This Month
               </Button>
             </div>
           </div>
           
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={dateRange?.from || new Date()}
-            selected={dateRange}
-            onSelect={handleDateSelect}
-            numberOfMonths={2}
-            captionLayout="dropdown"
-            fromYear={2020}
-            toYear={2030}
-            className="pointer-events-auto"
-          />
+          <div className="p-4">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={dateRange?.from || new Date()}
+              selected={dateRange}
+              onSelect={handleDateSelect}
+              numberOfMonths={2}
+              captionLayout="dropdown"
+              fromYear={2020}
+              toYear={2030}
+              className="pointer-events-auto rounded-lg"
+            />
+          </div>
           
           {getTimeDisplay() && (
-            <div className="p-4 border-t bg-muted/50">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>Time range: {getTimeDisplay()}</span>
+            <div className="p-4 border-t bg-gradient-to-r from-muted/30 to-muted/10 rounded-b-lg">
+              <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-2 text-primary">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-medium">Time Range</span>
+                </div>
+                <span className="text-foreground font-mono bg-background px-2 py-1 rounded border">
+                  {getTimeDisplay()}
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Based on report cycle time: {reportCycleTime}
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <span className="w-1 h-1 bg-primary rounded-full"></span>
+                Report cycle starts at {reportCycleTime} daily
               </p>
             </div>
           )}
