@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Download, Calendar, Loader2 } from 'lucide-react';
+import { FileText, Download, Calendar, Loader2, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Report {
@@ -30,6 +30,7 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [merchantData, setMerchantData] = useState<MerchantData | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
+  const [regenerating, setRegenerating] = useState<string | null>(null);
 
   useEffect(() => {
     if (profile?.role === 'merchant') {
@@ -139,6 +140,48 @@ const Reports = () => {
     }
   };
 
+  const regenerateReport = async (report: Report) => {
+    if (!merchantData) return;
+    
+    setRegenerating(report.id);
+    
+    try {
+      console.log('Regenerating report:', report.id);
+      
+      const { data, error } = await supabase.functions.invoke('generate-pdf-report', {
+        body: {
+          merchantId: merchantData.id,
+          reportDate: report.report_date,
+          reportType: report.report_type
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log('Report regenerated successfully:', data);
+      
+      toast({
+        title: 'Success',
+        description: 'Report regenerated successfully',
+      });
+      
+      // Refresh the reports list
+      await fetchData();
+      
+    } catch (error) {
+      console.error('Error regenerating report:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to regenerate report',
+        variant: 'destructive',
+      });
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
   const getReportTypeLabel = (type: string) => {
     switch (type) {
       case 'daily_sales':
@@ -243,6 +286,22 @@ const Reports = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {!report.file_url && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => regenerateReport(report)}
+                          disabled={regenerating === report.id}
+                          className="hover:shadow-soft transition-all duration-300"
+                        >
+                          {regenerating === report.id ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                          )}
+                          Generate PDF
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

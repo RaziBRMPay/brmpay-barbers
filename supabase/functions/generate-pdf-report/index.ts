@@ -126,9 +126,12 @@ const handler = async (req: Request): Promise<Response> => {
     const htmlContent = generateHTMLReport(reportData);
     
     // Generate PDF from HTML
-    const shopName = merchantData?.shop_name || 'Unknown_Shop';
-    const fileName = `${shopName.replace(/[^a-zA-Z0-9]/g, '_')}-${actualReportDate}-${reportType}.txt`;
+    const shopName = (merchantData?.shop_name && merchantData.shop_name.trim()) || 'Default_Shop';
+    const sanitizedShopName = shopName.replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `${sanitizedShopName}-${actualReportDate}-${reportType}.txt`;
     const filePath = `${merchantId}/${fileName}`;
+    
+    console.log(`Generating report for shop: ${shopName}, file: ${fileName}`);
     
     let reportInsertData: any = {
       merchant_id: merchantId,
