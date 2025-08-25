@@ -179,6 +179,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Found orders:', orders.length);
 
+    // Debug: Log first few orders to understand the data structure
+    if (orders.length > 0) {
+      console.log('Sample order structure:', JSON.stringify(orders[0], null, 2));
+      console.log('Sample order.total:', orders[0].total);
+      console.log('Sample order.created:', orders[0].created);
+      console.log('Sample order.employee:', orders[0].employee);
+    }
+
     // Calculate sales by employee and date
     const salesByEmployeeAndDate = new Map<string, { 
       employeeId: string,
@@ -188,32 +196,54 @@ const handler = async (req: Request): Promise<Response> => {
       orderCount: number 
     }>();
 
+    let processedOrdersCount = 0;
+    let totalSalesDebug = 0;
+
     // Process orders and calculate sales by employee and date
-    orders.forEach(order => {
+    orders.forEach((order, index) => {
       if (order.employee && order.employee.id && order.created) {
         const employeeId = order.employee.id;
         const employeeName = order.employee.name || 'Unknown Employee';
+        
+        // Debug order processing
+        if (index < 3) { // Log first 3 orders
+          console.log(`Order ${index}: Employee ${employeeId} (${employeeName}), Total: ${order.total}, Created: ${order.created}`);
+        }
         
         // Convert Unix timestamp to date string (YYYY-MM-DD)
         const orderDate = new Date(order.created).toISOString().split('T')[0];
         const key = `${employeeId}-${orderDate}`;
         
+        const orderTotal = order.total || 0;
+        totalSalesDebug += orderTotal;
+        processedOrdersCount++;
+        
         const current = salesByEmployeeAndDate.get(key);
         
         if (current) {
-          current.totalSales += order.total || 0;
+          current.totalSales += orderTotal;
           current.orderCount += 1;
         } else {
           salesByEmployeeAndDate.set(key, {
             employeeId,
             employeeName,
             salesDate: orderDate,
-            totalSales: order.total || 0,
+            totalSales: orderTotal,
             orderCount: 1
           });
         }
+      } else {
+        // Debug orders that are being skipped
+        if (index < 3) {
+          console.log(`Skipped order ${index}: employee=${!!order.employee}, employee.id=${order.employee?.id}, created=${order.created}`);
+        }
       }
     });
+
+    console.log(`Processed ${processedOrdersCount} orders out of ${orders.length}`);
+    console.log(`Total sales before conversion (cents): ${totalSalesDebug}`);
+    console.log(`Total sales after conversion (dollars): ${totalSalesDebug / 100}`);
+    console.log(`Sales entries created: ${salesByEmployeeAndDate.size}`);
 
     // Add zero-sales entries for employees with no sales on any day in the range
     // (Only for the start date to avoid cluttering the database)
