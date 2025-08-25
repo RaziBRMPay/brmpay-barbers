@@ -26,7 +26,7 @@ interface CloverOrder {
   id: string;
   employee: CloverEmployee;
   total: number;
-  created: number;
+  createdTime: number;
   taxAmount?: number;
   serviceCharge?: number;
 }
@@ -183,7 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (orders.length > 0) {
       console.log('Sample order structure:', JSON.stringify(orders[0], null, 2));
       console.log('Sample order.total:', orders[0].total);
-      console.log('Sample order.created:', orders[0].created);
+      console.log('Sample order.createdTime:', orders[0].createdTime);
       console.log('Sample order.employee:', orders[0].employee);
     }
 
@@ -201,17 +201,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Process orders and calculate sales by employee and date
     orders.forEach((order, index) => {
-      if (order.employee && order.employee.id && order.created) {
+      if (order.employee && order.employee.id && order.createdTime) {
         const employeeId = order.employee.id;
         const employeeName = order.employee.name || 'Unknown Employee';
         
         // Debug order processing
         if (index < 3) { // Log first 3 orders
-          console.log(`Order ${index}: Employee ${employeeId} (${employeeName}), Total: ${order.total}, Created: ${order.created}`);
+          console.log(`Order ${index}: Employee ${employeeId} (${employeeName}), Total: ${order.total}, CreatedTime: ${order.createdTime}`);
         }
         
         // Convert Unix timestamp to date string (YYYY-MM-DD)
-        const orderDate = new Date(order.created).toISOString().split('T')[0];
+        const orderDate = new Date(order.createdTime).toISOString().split('T')[0];
         const key = `${employeeId}-${orderDate}`;
         
         const orderTotal = order.total || 0;
@@ -235,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
       } else {
         // Debug orders that are being skipped
         if (index < 3) {
-          console.log(`Skipped order ${index}: employee=${!!order.employee}, employee.id=${order.employee?.id}, created=${order.created}`);
+          console.log(`Skipped order ${index}: employee=${!!order.employee}, employee.id=${order.employee?.id}, createdTime=${order.createdTime}`);
         }
       }
     });
