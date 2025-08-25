@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Settings as SettingsIcon, Save } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Clock, Play, AlertCircle, CheckCircle } from 'lucide-react';
 import CommissionConfiguration from '@/components/CommissionConfiguration';
 import SecureCredentialManager from '@/components/SecureCredentialManager';
 import SecurityAuditLog from '@/components/SecurityAuditLog';
@@ -48,6 +48,8 @@ const Settings = () => {
     report_time_cycle: '21:00',
   });
   const [cloverShopName, setCloverShopName] = useState<string>('');
+  const [cronStatus, setCronStatus] = useState<any>(null);
+  const [managingCron, setManagingCron] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -79,6 +81,9 @@ const Settings = () => {
 
         // Fetch shop name from Clover via secure credentials
         await fetchCloverShopNameSecure(merchant.id);
+
+        // Fetch cron job status
+        await fetchCronStatus(merchant.id);
 
         // Fetch settings
         const { data: settingsData, error: settingsError } = await supabase
@@ -120,6 +125,84 @@ const Settings = () => {
       console.error('Error fetching Clover shop name:', error);
       // Don't show error to user for security reasons
     }
+  };
+
+  const fetchCronStatus = async (merchantId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-cron-jobs', {
+        body: { 
+          action: 'status',
+          merchantId: merchantId
+        }
+      });
+      
+      if (!error && data) {
+        setCronStatus(data.status);
+      }
+    } catch (error) {
+      console.error('Error fetching cron status:', error);
+    }
+  };
+
+  const setupCronJob = async () => {
+    if (!merchantData) return;
+    
+    setManagingCron(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-cron-jobs', {
+        body: {
+          action: 'update',
+          merchantId: merchantData.id,
+          reportTime: formData.report_time_cycle + ':00',
+          timezone: formData.timezone
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Cron Job Updated',
+        description: 'Report scheduling has been updated successfully.',
+      });
+
+      await fetchCronStatus(merchantData.id);
+    } catch (error) {
+      console.error('Error managing cron job:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update scheduling. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setManagingCron(false);
+    }
+  };
+
+  const getNextReportTime = () => {
+    if (!formData.report_time_cycle || !formData.timezone) return 'Not configured';
+    
+    const now = new Date();
+    const [hours, minutes] = formData.report_time_cycle.split(':').map(Number);
+    
+    // Create next report time in local timezone
+    const nextReport = new Date();
+    nextReport.setHours(hours, minutes, 0, 0);
+    
+    // If time has passed today, schedule for tomorrow
+    if (nextReport <= now) {
+      nextReport.setDate(nextReport.getDate() + 1);
+    }
+    
+    return nextReport.toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    });
   };
 
   const handleSave = async () => {
@@ -287,6 +370,55 @@ const Settings = () => {
                 <p className="text-sm text-muted-foreground">
                   Time when daily reports are generated and sent
                 </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Next Scheduled Report</Label>
+                  <Button
+                    onClick={setupCronJob}
+                    disabled={managingCron}
+                    size="sm"
+                    variant="outline"
+                  >
+                    {managingCron ? 'Updating...' : 'Update Schedule'}
+                  </Button>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">
+                      {getNextReportTime()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Reports generate automatically at the scheduled time in your local timezone.
+                  </p>
+                </div>
+                
+                {cronStatus && (
+                  <div className="p-3 bg-muted/30 rounded-lg border">
+                    <div className="flex items-center gap-2 mb-2">
+                      {cronStatus.isConfigured ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="font-medium text-sm text-green-700">Scheduler Active</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-yellow-500" />
+                          <span className="font-medium text-sm text-yellow-700">Needs Configuration</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {cronStatus.isConfigured 
+                        ? `Cron job: ${cronStatus.cronExpression || 'Running'}`
+                        : 'Click "Update Schedule" to activate automatic reports'
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Download, Calendar, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Download, Calendar, Loader2, RefreshCw, TestTube, Play } from 'lucide-react';
 import { format } from 'date-fns';
+import ReportStatusMonitor from '@/components/ReportStatusMonitor';
+import ReportNotificationSystem from '@/components/ReportNotificationSystem';
 
 interface Report {
   id: string;
@@ -31,6 +33,7 @@ const Reports = () => {
   const [merchantData, setMerchantData] = useState<MerchantData | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [testingScheduler, setTestingScheduler] = useState(false);
 
   useEffect(() => {
     if (profile?.role === 'merchant') {
@@ -182,6 +185,46 @@ const Reports = () => {
     }
   };
 
+  const testScheduler = async () => {
+    if (!merchantData) return;
+    
+    setTestingScheduler(true);
+    
+    try {
+      console.log('Testing scheduler for merchant:', merchantData.id);
+      
+      const { data, error } = await supabase.functions.invoke('auto-report-scheduler', {
+        body: {
+          merchantId: merchantData.id
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log('Scheduler test completed:', data);
+      
+      toast({
+        title: 'Test Successful',
+        description: 'Report generation pipeline tested successfully. Check reports for new PDF.',
+      });
+      
+      // Refresh the reports list after a short delay
+      setTimeout(() => fetchData(), 2000);
+      
+    } catch (error) {
+      console.error('Error testing scheduler:', error);
+      toast({
+        title: 'Test Failed',
+        description: error instanceof Error ? error.message : 'Failed to test scheduler',
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingScheduler(false);
+    }
+  };
+
   const getReportTypeLabel = (type: string) => {
     switch (type) {
       case 'daily_sales':
@@ -219,16 +262,31 @@ const Reports = () => {
       <div className="space-y-8">
         {/* Header */}
         <div className="bg-gradient-card rounded-2xl p-6 shadow-soft border">
-          <div className="flex items-center space-x-3">
-            <div className="bg-primary/10 rounded-lg p-2">
-              <FileText className="h-6 w-6 text-primary" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-primary/10 rounded-lg p-2">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">Report Archive</h2>
+                <p className="text-muted-foreground">
+                  Access your automated PDF reports for {merchantData?.shop_name}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl font-bold text-foreground">Report Archive</h2>
-              <p className="text-muted-foreground">
-                Access your automated PDF reports for {merchantData?.shop_name}
-              </p>
-            </div>
+            <Button
+              onClick={testScheduler}
+              disabled={testingScheduler}
+              variant="outline"
+              className="hover:shadow-soft transition-all duration-300"
+            >
+              {testingScheduler ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <TestTube className="h-4 w-4 mr-2" />
+              )}
+              Test Scheduler
+            </Button>
           </div>
         </div>
 
@@ -319,6 +377,19 @@ const Reports = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Report Status Monitor */}
+        {merchantData && (
+          <ReportStatusMonitor 
+            merchantId={merchantData.id} 
+            shopName={merchantData.shop_name} 
+          />
+        )}
+
+        {/* Report Notifications */}
+        {merchantData && (
+          <ReportNotificationSystem merchantId={merchantData.id} />
+        )}
 
         {/* Info Card */}
         <Card className="shadow-soft border-0 bg-gradient-card">

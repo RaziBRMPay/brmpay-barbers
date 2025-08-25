@@ -44,6 +44,8 @@ const handler = async (req: Request): Promise<Response> => {
         return await deleteCronJob(supabaseClient, merchantId);
       case 'setup_all':
         return await setupAllMerchantCronJobs(supabaseClient);
+      case 'status':
+        return await getCronJobStatus(supabaseClient, merchantId);
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -139,6 +141,88 @@ async function deleteCronJob(supabaseClient: any, merchantId: string): Promise<R
       },
     }
   );
+}
+
+async function getCronJobStatus(supabaseClient: any, merchantId: string): Promise<Response> {
+  const jobName = `auto-report-${merchantId}`;
+  
+  console.log(`Getting status for cron job: ${jobName}`);
+  
+  try {
+    // Get merchant settings to determine current configuration
+    const { data: settings, error: settingsError } = await supabaseClient
+      .from('settings')
+      .select(`
+        report_time_cycle,
+        last_completed_report_cycle_time,
+        merchants!inner (
+          timezone,
+          shop_name
+        )
+      `)
+      .eq('merchant_id', merchantId)
+      .single();
+
+    if (settingsError) {
+      console.error('Error fetching settings:', settingsError);
+      throw new Error(`Failed to fetch settings: ${settingsError.message}`);
+    }
+
+    const timezone = settings.merchants.timezone;
+    const reportTime = settings.report_time_cycle;
+    const cronExpression = convertToCronExpression(reportTime, timezone);
+    
+    // Calculate next run time
+    const [hours, minutes] = reportTime.split(':').map(Number);
+    const nextRun = new Date();
+    nextRun.setHours(hours, minutes, 0, 0);
+    
+    // If time has passed today, schedule for tomorrow
+    if (nextRun <= new Date()) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        status: {
+          jobName,
+          cronExpression,
+          isConfigured: true,
+          nextRunTime: nextRun.toISOString(),
+          lastCompletedRun: settings.last_completed_report_cycle_time,
+          reportTime: reportTime,
+          timezone: timezone,
+          shopName: settings.merchants.shop_name
+        }
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        status: {
+          jobName,
+          isConfigured: false,
+          error: error.message
+        }
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      }
+    );
+  }
 }
 
 async function setupAllMerchantCronJobs(supabaseClient: any): Promise<Response> {
