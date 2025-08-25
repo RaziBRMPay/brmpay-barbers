@@ -28,30 +28,68 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('Email Commission Report Function Started - v2.0');
+    console.log('Email Commission Report Function Started - v3.0 FORCED REDEPLOY');
     
-    // Get environment variables
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // COMPREHENSIVE ENVIRONMENT DEBUGGING
+    console.log('=== ENVIRONMENT DEBUGGING START ===');
+    
+    // Get all environment variables
+    const allEnvVars = Deno.env.toObject();
+    console.log('Total environment variables:', Object.keys(allEnvVars).length);
+    console.log('All env keys:', Object.keys(allEnvVars));
+    
+    // Filter relevant keys
+    const relevantKeys = Object.keys(allEnvVars).filter(key => 
+      key.includes('RESEND') || key.includes('SUPABASE')
+    );
+    console.log('Relevant keys:', relevantKeys);
+    
+    // Show relevant key-value pairs (first 10 chars of values for security)
+    const relevantEnvs = {};
+    relevantKeys.forEach(key => {
+      const value = allEnvVars[key];
+      relevantEnvs[key] = value ? `${value.substring(0, 10)}...` : 'NULL/EMPTY';
+    });
+    console.log('Relevant env vars:', relevantEnvs);
+    
+    // Try multiple ways to access RESEND_API_KEY
+    const resendApiKey1 = Deno.env.get('RESEND_API_KEY');
+    const resendApiKey2 = allEnvVars['RESEND_API_KEY'];
+    const resendApiKey3 = allEnvVars.RESEND_API_KEY;
+    
+    console.log('RESEND_API_KEY access attempts:', {
+      'Deno.env.get()': resendApiKey1 ? `present (${resendApiKey1.substring(0, 8)}...)` : 'MISSING',
+      'allEnvVars[]': resendApiKey2 ? `present (${resendApiKey2.substring(0, 8)}...)` : 'MISSING',
+      'allEnvVars.': resendApiKey3 ? `present (${resendApiKey3.substring(0, 8)}...)` : 'MISSING'
+    });
+    
+    // Use the first working key
+    const resendApiKey = resendApiKey1 || resendApiKey2 || resendApiKey3;
+    
+    // Get other environment variables with fallbacks
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || allEnvVars['SUPABASE_URL'];
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || allEnvVars['SUPABASE_SERVICE_ROLE_KEY'];
 
-    // Enhanced logging for debugging
-    console.log('Environment check:', {
-      resendApiKey: resendApiKey ? `present (${resendApiKey.substring(0, 8)}...)` : 'MISSING',
+    console.log('Final environment check:', {
+      resendApiKey: resendApiKey ? `present (${resendApiKey.substring(0, 8)}...)` : 'STILL MISSING',
       supabaseUrl: supabaseUrl ? 'present' : 'MISSING',
       supabaseKey: supabaseKey ? 'present' : 'MISSING'
     });
-
-    console.log('All environment variables:', Object.keys(Deno.env.toObject()).filter(key => 
-      key.includes('RESEND') || key.includes('SUPABASE')
-    ));
+    
+    console.log('=== ENVIRONMENT DEBUGGING END ===');
 
     if (!resendApiKey) {
-      console.error('RESEND_API_KEY is missing');
+      console.error('CRITICAL: RESEND_API_KEY is still missing after all attempts');
+      console.error('Available environment variables:', Object.keys(allEnvVars));
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'RESEND_API_KEY not configured' 
+          error: 'RESEND_API_KEY not accessible - check secret configuration',
+          debug: {
+            totalEnvVars: Object.keys(allEnvVars).length,
+            relevantKeys: relevantKeys,
+            hasResendKey: relevantKeys.includes('RESEND_API_KEY')
+          }
         }),
         { 
           status: 500, 
