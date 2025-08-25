@@ -214,11 +214,11 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
     }
     
     // For display purposes, we want to show the local time (not UTC time)
-    // Create a display time that represents the local time
+    // Create a display time that represents the local time in merchant's timezone
     const displayTime = new Date();
-    displayTime.setHours(hours, minutes, 0, 0);
+    displayTime.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
     if (displayTime <= now) {
-      displayTime.setDate(displayTime.getDate() + 1);
+      displayTime.setUTCDate(displayTime.getUTCDate() + 1);
     }
 
     return new Response(
