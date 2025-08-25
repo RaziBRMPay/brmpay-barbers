@@ -28,7 +28,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log('Email Commission Report Function Started - v3.0 FORCED REDEPLOY');
+    console.log('Email Commission Report Function Started - v4.0 FRESH DEPLOYMENT');
     
     // COMPREHENSIVE ENVIRONMENT DEBUGGING
     console.log('=== ENVIRONMENT DEBUGGING START ===');
