@@ -6,14 +6,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Timezone mapping for US timezones
-const TIMEZONE_OFFSETS = {
-  'US/Eastern': -5,    // EST (UTC-5)
-  'US/Central': -6,    // CST (UTC-6)
-  'US/Mountain': -7,   // MST (UTC-7)
-  'US/Pacific': -8,    // PST (UTC-8)
-  'US/Alaska': -9,     // AKST (UTC-9)
-  'US/Hawaii': -10,    // HST (UTC-10)
+// Function to check if a date is during Daylight Saving Time
+const isDST = (date: Date): boolean => {
+  const year = date.getFullYear();
+  // DST starts on the second Sunday in March
+  const dstStart = new Date(year, 2, 1); // March 1st
+  dstStart.setDate(dstStart.getDate() + (7 - dstStart.getDay()) + 7); // Second Sunday
+  
+  // DST ends on the first Sunday in November
+  const dstEnd = new Date(year, 10, 1); // November 1st
+  dstEnd.setDate(dstEnd.getDate() + (7 - dstEnd.getDay())); // First Sunday
+  
+  return date >= dstStart && date < dstEnd;
+};
+
+// Function to get timezone offset accounting for DST
+const getTimezoneOffset = (timezone: string, date: Date = new Date()): number => {
+  const baseOffsets = {
+    'US/Eastern': isDST(date) ? -4 : -5,   // EDT/EST
+    'US/Central': isDST(date) ? -5 : -6,   // CDT/CST
+    'US/Mountain': isDST(date) ? -6 : -7,  // MDT/MST
+    'US/Pacific': isDST(date) ? -7 : -8,   // PDT/PST
+    'US/Alaska': isDST(date) ? -8 : -9,    // AKDT/AKST
+    'US/Hawaii': -10,   // HST (no DST)
+  };
+  
+  return baseOffsets[timezone as keyof typeof baseOffsets] || -5;
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -172,24 +190,17 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
     const reportTime = settings.report_time_cycle;
     const cronExpression = convertToCronExpression(reportTime, timezone);
     
-    // Calculate next run time in the merchant's local timezone
+    // Calculate next run time properly accounting for DST
     const [hours, minutes] = reportTime.split(':').map(Number);
-    const timezoneOffset = TIMEZONE_OFFSETS[timezone as keyof typeof TIMEZONE_OFFSETS] || -5;
-    
-    // Create date for today at the report time in local timezone
     const now = new Date();
-    const localNow = new Date(now.getTime() + (timezoneOffset * 60 * 60 * 1000));
     
+    // Create a date for today at the report time
     const nextRun = new Date();
-    // Set the time in local timezone by adjusting for the offset
-    nextRun.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
+    nextRun.setHours(hours, minutes, 0, 0);
     
-    // If time has passed today in local timezone, schedule for tomorrow
-    const localReportTime = new Date();
-    localReportTime.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
-    
-    if (localReportTime <= now) {
-      nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+    // If the time has passed today, move to tomorrow
+    if (nextRun <= now) {
+      nextRun.setDate(nextRun.getDate() + 1);
     }
 
     return new Response(
@@ -333,8 +344,8 @@ function convertToCronExpression(reportTime: string, timezone: string): string {
   // Parse the local time (HH:MM:SS format)
   const [hours, minutes] = reportTime.split(':').map(Number);
   
-  // Get timezone offset (this is a simplified approach)
-  const offset = TIMEZONE_OFFSETS[timezone as keyof typeof TIMEZONE_OFFSETS] || -5;
+  // Get timezone offset accounting for DST
+  const offset = getTimezoneOffset(timezone);
   
   // Convert local time to UTC
   let utcHours = hours - offset;
