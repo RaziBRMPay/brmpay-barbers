@@ -96,26 +96,44 @@ const Reports = () => {
     }
 
     try {
-      // Create a temporary link to trigger download
-      const link = document.createElement('a');
-      link.href = report.file_url;
-      link.download = report.file_name || 'report.pdf';
-      link.target = '_blank';
+      console.log('Downloading report from:', report.file_url);
       
-      // Append to body, click, and remove
+      // Fetch the file from the Supabase Storage URL
+      const response = await fetch(report.file_url);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.status} ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      
+      // Determine file extension and MIME type
+      const isTextFile = report.file_name?.endsWith('.txt');
+      const mimeType = isTextFile ? 'text/plain' : 'application/pdf';
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([blob], { type: mimeType }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = report.file_name || `report-${report.report_date}.${isTextFile ? 'txt' : 'pdf'}`;
+      
+      // Trigger download
       document.body.appendChild(link);
       link.click();
+      
+      // Cleanup
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
       toast({
-        title: 'Download Started',
-        description: `Downloading ${report.file_name || 'report.pdf'}`,
+        title: 'Download Complete',
+        description: `Report ${report.file_name} downloaded successfully.`,
       });
     } catch (error) {
       console.error('Error downloading report:', error);
       toast({
         title: 'Error',
-        description: 'Failed to download report',
+        description: error instanceof Error ? error.message : 'Failed to download report',
         variant: 'destructive',
       });
     }
