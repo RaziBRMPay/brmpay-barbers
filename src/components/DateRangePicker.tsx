@@ -135,6 +135,32 @@ export function DateRangePicker({
     setIsOpen(false);
   };
 
+  // Preset: This Month
+  const selectThisMonth = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Start of month at report cycle time
+    const startOfMonth = new Date(currentYear, currentMonth, 1);
+    const startOfRange = applyReportCycleTime(startOfMonth);
+    
+    // Current time as end
+    const endOfRange = now;
+    
+    // Validate that start is not after end
+    if (startOfRange > endOfRange) {
+      console.warn('Invalid date range: start date is after end date');
+      return;
+    }
+
+    onDateRangeChange({
+      from: startOfRange,
+      to: endOfRange
+    });
+    setIsOpen(false);
+  };
+
   // Format display text
   const getDisplayText = () => {
     if (!dateRange?.from) return "Pick a date range";
@@ -191,16 +217,27 @@ export function DateRangePicker({
               >
                 Yesterday
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={selectThisMonth}
+                className="flex-1"
+              >
+                This Month
+              </Button>
             </div>
           </div>
           
           <Calendar
             initialFocus
             mode="range"
-            defaultMonth={dateRange?.from}
+            defaultMonth={dateRange?.from || new Date()}
             selected={dateRange}
             onSelect={handleDateSelect}
             numberOfMonths={2}
+            captionLayout="dropdown"
+            fromYear={2020}
+            toYear={2030}
             className="pointer-events-auto"
           />
           
