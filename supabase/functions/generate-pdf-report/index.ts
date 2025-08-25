@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
+import puppeteer from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -128,7 +129,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate PDF from HTML
     const shopName = (merchantData?.shop_name && merchantData.shop_name.trim()) || 'Default_Shop';
     const sanitizedShopName = shopName.replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `${sanitizedShopName}-${actualReportDate}-${reportType}.txt`;
+    const fileName = `${sanitizedShopName}-${actualReportDate}-${reportType}.pdf`;
     const filePath = `${merchantId}/${fileName}`;
     
     console.log(`Generating report for shop: ${shopName}, file: ${fileName}`);
@@ -150,44 +151,39 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       console.log(`Generating PDF for ${reportData.merchantName} - ${actualReportDate}`);
       
-      // Create simple text-based PDF content as a fallback
-      const textContent = `
-${reportData.merchantName}
-Daily Sales Report
-====================================
-
-Report Date: ${actualReportDate}
-Period: ${reportData.periodDescription}
-Generated: ${new Date(reportData.generatedAt).toLocaleString()}
-
-SUMMARY
--------
-Total Sales: $${reportData.totalSales.toFixed(2)}
-Total Commission: $${reportData.totalCommission.toFixed(2)}
-Shop Commission: $${reportData.shopCommission.toFixed(2)}
-
-EMPLOYEE PERFORMANCE
--------------------
-${reportData.employees.map(emp => 
-  `${emp.employee_name} (${emp.employee_id})
-  Sales: $${emp.total_sales.toFixed(2)}
-  Commission: $${emp.commission_amount.toFixed(2)}\n`
-).join('\n')}
-
-Report generated automatically by the system.
-====================================
-`;
-
-      // Convert text to a simple PDF-like format using basic text encoding
-      const pdfBytes = new TextEncoder().encode(textContent);
+      // Launch Puppeteer browser
+      const browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+      
+      const page = await browser.newPage();
+      
+      // Set the HTML content
+      await page.setContent(htmlContent, {
+        waitUntil: 'networkidle0'
+      });
+      
+      // Generate PDF buffer
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: {
+          top: '20px',
+          right: '20px',
+          bottom: '20px',
+          left: '20px'
+        }
+      });
+      
+      await browser.close();
       
       console.log('PDF content created, uploading to storage...');
       
       // Upload PDF to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabaseClient.storage
         .from('reports')
-        .upload(filePath, pdfBytes, {
-          contentType: 'text/plain', // Using text/plain for now, can be changed to application/pdf later
+        .upload(filePath, pdfBuffer, {
+          contentType: 'application/pdf',
           upsert: true
         });
 
