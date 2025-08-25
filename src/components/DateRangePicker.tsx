@@ -161,6 +161,13 @@ export function DateRangePicker({
     setIsOpen(false);
   };
 
+  // Year navigation
+  const [displayYear, setDisplayYear] = useState(new Date().getFullYear());
+  
+  const navigateToYear = (year: number) => {
+    setDisplayYear(year);
+  };
+
   // Format display text
   const getDisplayText = () => {
     if (!dateRange?.from) return "Pick a date range";
@@ -207,7 +214,7 @@ export function DateRangePicker({
         <PopoverContent className="w-auto p-0 shadow-lg border-2" align="start">
           <div className="p-6 border-b bg-gradient-to-r from-background to-muted/20">
             <h4 className="font-semibold text-base mb-4 text-foreground">Quick Select</h4>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 mb-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -233,19 +240,38 @@ export function DateRangePicker({
                 This Month
               </Button>
             </div>
+            
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Jump to Year</p>
+              <div className="flex gap-1 flex-wrap">
+                {[2022, 2023, 2024, 2025, 2026].map((year) => (
+                  <Button
+                    key={year}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigateToYear(year)}
+                    className={cn(
+                      "h-8 px-3 text-xs font-medium transition-all duration-200",
+                      displayYear === year 
+                        ? "bg-primary text-primary-foreground" 
+                        : "hover:bg-primary/10 hover:text-primary"
+                    )}
+                  >
+                    {year}
+                  </Button>
+                ))}
+              </div>
+            </div>
           </div>
           
           <div className="p-4">
             <Calendar
               initialFocus
               mode="range"
-              defaultMonth={dateRange?.from || new Date()}
+              defaultMonth={new Date(displayYear, dateRange?.from?.getMonth() || new Date().getMonth())}
               selected={dateRange}
               onSelect={handleDateSelect}
               numberOfMonths={2}
-              captionLayout="dropdown"
-              fromYear={2020}
-              toYear={2030}
               className="pointer-events-auto rounded-lg"
             />
           </div>
