@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
-import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
-import { PDF } from "https://deno.land/x/pdfgen@v0.1.1/mod.ts";
+// @ts-ignore
+import jsPDF from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -146,33 +146,49 @@ const handler = async (req: Request): Promise<Response> => {
     };
     
     try {
-      // Create PDF from HTML (simplified approach - in production you'd use better HTML-to-PDF conversion)
-      const pdf = new PDF({ size: "A4", margin: { top: 40, bottom: 40, left: 40, right: 40 } });
+      // Create PDF using jsPDF
+      const pdf = new jsPDF();
       
-      // Add content to PDF (this is a basic implementation)
-      pdf.text(`${merchantData?.shop_name} - Daily Sales Report`, { fontSize: 20, align: "center" });
-      pdf.text(`Report Date: ${actualReportDate}`, { fontSize: 12, y: 80 });
-      pdf.text(`Period: ${reportData.periodDescription}`, { fontSize: 12, y: 100 });
-      pdf.text(`Total Sales: $${reportData.totalSales.toFixed(2)}`, { fontSize: 14, y: 140 });
-      pdf.text(`Total Commission: $${reportData.totalCommission.toFixed(2)}`, { fontSize: 14, y: 160 });
-      pdf.text(`Shop Commission: $${reportData.shopCommission.toFixed(2)}`, { fontSize: 14, y: 180 });
+      // Add header
+      pdf.setFontSize(20);
+      pdf.text(`${merchantData?.shop_name}`, 20, 30);
+      pdf.setFontSize(16);
+      pdf.text('Daily Sales Report', 20, 45);
+      
+      // Add report details
+      pdf.setFontSize(12);
+      pdf.text(`Report Date: ${actualReportDate}`, 20, 65);
+      pdf.text(`Period: ${reportData.periodDescription}`, 20, 75);
+      pdf.text(`Generated: ${new Date(reportData.generatedAt).toLocaleString()}`, 20, 85);
+      
+      // Add summary
+      pdf.setFontSize(14);
+      pdf.text('Summary:', 20, 105);
+      pdf.setFontSize(12);
+      pdf.text(`Total Sales: $${reportData.totalSales.toFixed(2)}`, 20, 120);
+      pdf.text(`Total Commission: $${reportData.totalCommission.toFixed(2)}`, 20, 130);
+      pdf.text(`Shop Commission: $${reportData.shopCommission.toFixed(2)}`, 20, 140);
       
       // Add employee data
-      let yPos = 220;
-      pdf.text("Employee Performance:", { fontSize: 16, y: yPos });
-      yPos += 30;
+      let yPos = 165;
+      pdf.setFontSize(14);
+      pdf.text('Employee Performance:', 20, yPos);
+      yPos += 15;
+      pdf.setFontSize(10);
       
       for (const employee of reportData.employees) {
-        if (yPos > 700) { // Add new page if needed
+        if (yPos > 270) { // Add new page if needed
           pdf.addPage();
-          yPos = 50;
+          yPos = 20;
         }
-        pdf.text(`${employee.employee_name} (${employee.employee_id})`, { fontSize: 12, y: yPos });
-        pdf.text(`Sales: $${employee.total_sales.toFixed(2)} | Commission: $${employee.commission_amount.toFixed(2)}`, { fontSize: 10, y: yPos + 15 });
-        yPos += 40;
+        pdf.text(`${employee.employee_name} (${employee.employee_id})`, 20, yPos);
+        pdf.text(`Sales: $${employee.total_sales.toFixed(2)}`, 20, yPos + 10);
+        pdf.text(`Commission: $${employee.commission_amount.toFixed(2)}`, 110, yPos + 10);
+        yPos += 25;
       }
       
-      const pdfBytes = await pdf.save();
+      // Get PDF as array buffer
+      const pdfBytes = pdf.output('arraybuffer');
       
       // Upload PDF to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabaseClient.storage
