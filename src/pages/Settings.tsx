@@ -23,7 +23,6 @@ interface MerchantData {
 
 interface SettingsData {
   id: string;
-  commission_percentage: number;
   report_time_cycle: string;
 }
 
@@ -46,7 +45,6 @@ const Settings = () => {
   const [formData, setFormData] = useState({
     shop_name: '',
     timezone: 'US/Eastern' as USTimezone,
-    commission_percentage: 70,
     report_time_cycle: '21:00',
   });
   const [cloverShopName, setCloverShopName] = useState<string>('');
@@ -95,7 +93,6 @@ const Settings = () => {
           setSettings(settingsData);
           setFormData(prev => ({
             ...prev,
-            commission_percentage: settingsData.commission_percentage,
             report_time_cycle: settingsData.report_time_cycle.slice(0, 5), // Remove seconds
           }));
         }
@@ -166,7 +163,6 @@ const Settings = () => {
         const { error: settingsError } = await supabase
           .from('settings')
           .update({
-            commission_percentage: formData.commission_percentage,
             report_time_cycle: formData.report_time_cycle + ':00',
           })
           .eq('id', settings.id);
@@ -177,7 +173,6 @@ const Settings = () => {
           .from('settings')
           .insert({
             merchant_id: merchantId,
-            commission_percentage: formData.commission_percentage,
             report_time_cycle: formData.report_time_cycle + ':00',
           });
 
@@ -272,34 +267,15 @@ const Settings = () => {
             </CardContent>
           </Card>
 
-          {/* Commission Settings */}
+          {/* Report Settings */}
           <Card className="shadow-soft border-0 bg-gradient-card">
             <CardHeader>
-              <CardTitle>Commission Settings</CardTitle>
+              <CardTitle>Report Settings</CardTitle>
               <CardDescription>
-                Configure how commissions are calculated
+                Configure when daily reports are generated
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="commission_percentage">Commission Percentage (%)</Label>
-                <Input
-                  id="commission_percentage"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={formData.commission_percentage}
-                  onChange={(e) => setFormData(prev => ({ 
-                    ...prev, 
-                    commission_percentage: parseFloat(e.target.value) || 0 
-                  }))}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Percentage of sales that goes to the employee
-                </p>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="report_time_cycle">Daily Report Time</Label>
                 <Input

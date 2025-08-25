@@ -14,7 +14,6 @@ interface AssignedStore {
   timezone: string;
   user_email: string;
   settings?: {
-    commission_percentage: number;
     report_time_cycle: string;
   };
 }
@@ -59,7 +58,6 @@ const SubAdminDashboard = () => {
               email
             ),
             settings (
-              commission_percentage,
               report_time_cycle
             )
           )
@@ -221,8 +219,8 @@ const SubAdminDashboard = () => {
                           <p className="font-medium">{store.timezone.replace('US/', '')}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Commission</p>
-                          <p className="font-medium">{store.settings?.commission_percentage || 70}%</p>
+                          <p className="text-muted-foreground">Report Time</p>
+                          <p className="font-medium">{store.settings?.report_time_cycle?.slice(0, 5) || '9:00 PM'}</p>
                         </div>
                       </div>
                       <div className="pt-2">

@@ -19,7 +19,6 @@ interface MerchantData {
 }
 
 interface SettingsData {
-  commission_percentage: number;
   report_time_cycle: string;
   last_completed_report_cycle_time?: string;
 }

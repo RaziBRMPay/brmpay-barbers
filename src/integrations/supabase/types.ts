@@ -313,7 +313,6 @@ export type Database = {
       }
       settings: {
         Row: {
-          commission_percentage: number
           created_at: string
           id: string
           last_completed_report_cycle_time: string | null
@@ -322,7 +321,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          commission_percentage?: number
           created_at?: string
           id?: string
           last_completed_report_cycle_time?: string | null
@@ -331,7 +329,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          commission_percentage?: number
           created_at?: string
           id?: string
           last_completed_report_cycle_time?: string | null
