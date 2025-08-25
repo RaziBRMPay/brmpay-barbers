@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.email-commission-report]
 verify_jwt = false
+
+[functions.manage-cron-jobs]
+verify_jwt = false
