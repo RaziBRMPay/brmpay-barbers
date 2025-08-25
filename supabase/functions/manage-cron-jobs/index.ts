@@ -365,8 +365,15 @@ function convertToCronExpression(reportTime: string, timezone: string): string {
   // Get timezone offset accounting for DST
   const offset = getTimezoneOffset(timezone);
   
+  console.log(`Converting ${reportTime} in ${timezone} to UTC`);
+  console.log(`Local hours: ${hours}, Timezone offset: ${offset}`);
+  
   // Convert local time to UTC
-  let utcHours = hours - offset;
+  // For negative offsets (US timezones), we need to add the absolute value
+  // Example: 9 PM Eastern (UTC-4) = 21 + 4 = 25 -> 1 AM UTC next day
+  let utcHours = hours + Math.abs(offset);
+  
+  console.log(`UTC hours before rollover: ${utcHours}`);
   
   // Handle day rollover
   if (utcHours >= 24) {
@@ -375,9 +382,14 @@ function convertToCronExpression(reportTime: string, timezone: string): string {
     utcHours += 24;
   }
   
+  console.log(`Final UTC hours: ${utcHours}`);
+  
   // Return cron expression (minute hour * * *)
   // Run daily at the specified UTC time
-  return `${minutes} ${utcHours} * * *`;
+  const cronExpr = `${minutes} ${utcHours} * * *`;
+  console.log(`Generated cron expression: ${cronExpr}`);
+  
+  return cronExpr;
 }
 
 serve(handler);
