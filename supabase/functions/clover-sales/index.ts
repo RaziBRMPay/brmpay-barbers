@@ -26,7 +26,7 @@ interface CloverOrder {
   id: string;
   employee: CloverEmployee;
   total: number;
-  created: number;
+  createdTime: number;
   taxAmount?: number;
   serviceCharge?: number;
 }
@@ -154,30 +154,65 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Found employees:', employees.length);
 
-    // Fetch orders from Clover API
+    // Fetch orders from Clover API with pagination
     console.log('Fetching orders from Clover API...');
-    const ordersResponse = await fetch(
-      `https://api.clover.com/v3/merchants/${cloverMerchantId}/orders?filter=createdTime>=${startTime}&filter=createdTime<=${endTime}&expand=lineItems,employee`,
-      {
-        headers: {
-          'Authorization': `Bearer ${cloverApiToken}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    
+    const allOrders: CloverOrder[] = [];
+    let offset = 0;
+    const limit = 1000; // Clover's maximum limit per request
+    let batchCount = 0;
+    
+    while (true) {
+      batchCount++;
+      console.log(`Fetching batch ${batchCount} (offset: ${offset}, limit: ${limit})`);
+      
+      const ordersResponse = await fetch(
+        `https://api.clover.com/v3/merchants/${cloverMerchantId}/orders?filter=createdTime>=${startTime}&filter=createdTime<=${endTime}&expand=lineItems,employee&limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${cloverApiToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-    if (!ordersResponse.ok) {
-      console.error('Clover orders API error:', ordersResponse.status);
-      return new Response(JSON.stringify({ error: 'Failed to fetch orders from Clover' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (!ordersResponse.ok) {
+        console.error(`Clover orders API error on batch ${batchCount}:`, ordersResponse.status);
+        return new Response(JSON.stringify({ error: 'Failed to fetch orders from Clover' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const ordersData = await ordersResponse.json();
+      const batchOrders: CloverOrder[] = ordersData.elements || [];
+      
+      console.log(`Batch ${batchCount}: fetched ${batchOrders.length} orders`);
+      
+      // Add this batch to our total orders
+      allOrders.push(...batchOrders);
+      
+      // If this batch has fewer orders than the limit, we've reached the end
+      if (batchOrders.length < limit) {
+        console.log(`Pagination complete. Total batches: ${batchCount}, Total orders: ${allOrders.length}`);
+        break;
+      }
+      
+      // Move to next batch
+      offset += limit;
+      
+      // Safety check to prevent infinite loops (adjust based on your needs)
+      if (batchCount >= 100) {
+        console.log('Reached maximum batch limit (100), stopping pagination');
+        break;
+      }
+      
+      // Small delay to respect rate limits (Clover allows 16 requests/second)
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    const ordersData = await ordersResponse.json();
-    const orders: CloverOrder[] = ordersData.elements || [];
-
-    console.log('Found orders:', orders.length);
+    const orders = allOrders;
+    console.log('Total orders fetched across all batches:', orders.length);
 
     // Calculate sales by employee
     const salesByEmployee = new Map<string, { 
