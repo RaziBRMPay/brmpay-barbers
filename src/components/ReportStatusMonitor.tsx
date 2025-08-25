@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Clock, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface ReportStatusMonitorProps {
   merchantId: string;
@@ -146,7 +146,7 @@ const ReportStatusMonitor: React.FC<ReportStatusMonitorProps> = ({ merchantId, s
                     <span className="font-medium text-sm">Next Report</span>
                   </div>
                   <p className="text-sm text-foreground">
-                    {format(new Date(cronStatus.nextRunTime), 'EEEE, MMM dd, yyyy \'at\' h:mm a')}
+                    {formatInTimeZone(new Date(cronStatus.nextRunTime), cronStatus.timezone, 'EEEE, MMM dd, yyyy \'at\' h:mm a')}
                   </p>
                 </div>
               )}
@@ -158,7 +158,7 @@ const ReportStatusMonitor: React.FC<ReportStatusMonitorProps> = ({ merchantId, s
                     <span className="font-medium text-sm">Last Completed</span>
                   </div>
                   <p className="text-sm text-foreground">
-                    {format(new Date(cronStatus.lastCompletedRun), 'MMM dd, yyyy \'at\' h:mm a')}
+                    {formatInTimeZone(new Date(cronStatus.lastCompletedRun), cronStatus.timezone, 'MMM dd, yyyy \'at\' h:mm a')}
                   </p>
                 </div>
               )}
