@@ -100,6 +100,25 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Generating report for merchant: ${merchantName} - Period: ${startDateTime} to ${endDateTime}`);
 
     try {
+      // First, fetch fresh sales data from Clover for the period
+      console.log(`Fetching fresh sales data for period: ${startDateTime} to ${endDateTime}`);
+      
+      const salesResponse = await supabaseClient.functions.invoke('clover-sales', {
+        body: {
+          merchantId,
+          startDate: startDateTime,
+          endDate: endDateTime
+        }
+      });
+
+      if (salesResponse.error) {
+        console.error(`Error fetching sales data for ${merchantName}:`, salesResponse.error);
+        // Continue with report generation even if sales fetch fails
+        console.log('Continuing with report generation using existing data...');
+      } else {
+        console.log(`Sales data fetched successfully for ${merchantName}`);
+      }
+
       // Generate PDF report for the business day period that just ended
       const reportResponse = await supabaseClient.functions.invoke('generate-pdf-report', {
         body: {
