@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
-import puppeteer from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
+import jsPDF from "https://esm.sh/jspdf@2.5.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -151,31 +151,97 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       console.log(`Generating PDF for ${reportData.merchantName} - ${actualReportDate}`);
       
-      // Launch Puppeteer browser
-      const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      // Create PDF using jsPDF
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
       });
+
+      // Set font and margins
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const contentWidth = pageWidth - (margin * 2);
       
-      const page = await browser.newPage();
+      let yPosition = margin;
       
-      // Set the HTML content
-      await page.setContent(htmlContent, {
-        waitUntil: 'networkidle0'
-      });
+      // Header
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Daily Sales Report`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
       
-      // Generate PDF buffer
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: {
-          top: '20px',
-          right: '20px',
-          bottom: '20px',
-          left: '20px'
-        }
-      });
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'normal');
+      doc.text(reportData.merchantName, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
       
-      await browser.close();
+      doc.setFontSize(12);
+      doc.text(`Report Date: ${reportData.periodDescription}`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
+      
+      // Summary section
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('Summary', margin, yPosition);
+      yPosition += 10;
+      
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Total Sales: $${reportData.totalSales.toFixed(2)}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Commission Paid: $${reportData.totalCommission.toFixed(2)}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Shop Commission: $${reportData.shopCommission.toFixed(2)}`, margin, yPosition);
+      yPosition += 6;
+      doc.text(`Employee Count: ${reportData.employees.length}`, margin, yPosition);
+      yPosition += 15;
+      
+      // Employee performance table
+      if (reportData.employees.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text('Employee Performance', margin, yPosition);
+        yPosition += 10;
+        
+        // Table headers
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        const colWidths = [60, 40, 40, 40];
+        const headers = ['Employee Name', 'Sales', 'Commission', 'Date'];
+        let xPosition = margin;
+        
+        headers.forEach((header, index) => {
+          doc.text(header, xPosition, yPosition);
+          xPosition += colWidths[index];
+        });
+        
+        yPosition += 8;
+        
+        // Table rows
+        doc.setFont(undefined, 'normal');
+        reportData.employees.forEach((employee: any) => {
+          if (yPosition > pageHeight - 30) {
+            doc.addPage();
+            yPosition = margin;
+          }
+          
+          xPosition = margin;
+          doc.text(employee.employee_name || employee.employee_id, xPosition, yPosition);
+          xPosition += colWidths[0];
+          doc.text(`$${employee.total_sales.toFixed(2)}`, xPosition, yPosition);
+          xPosition += colWidths[1];
+          doc.text(`$${employee.commission_amount.toFixed(2)}`, xPosition, yPosition);
+          xPosition += colWidths[2];
+          doc.text(employee.sales_date || 'N/A', xPosition, yPosition);
+          
+          yPosition += 6;
+        });
+      }
+      
+      // Convert to buffer
+      const pdfBuffer = new Uint8Array(doc.output('arraybuffer'));
       
       console.log('PDF content created, uploading to storage...');
       
