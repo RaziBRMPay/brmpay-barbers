@@ -151,14 +151,28 @@ const handler = async (req: Request): Promise<Response> => {
     try {
       console.log(`Generating PDF for ${reportData.merchantName} - ${actualReportDate}`);
       
-      // Create PDF using jsPDF
+      // Create enhanced PDF using jsPDF
       const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
 
-      // Set font and margins
+      // Professional color palette (HSL converted to RGB for jsPDF)
+      const colors = {
+        primary: [102, 126, 234],      // #667eea
+        primaryDark: [118, 75, 162],   // #764ba2
+        success: [40, 167, 69],        // #28a745
+        info: [23, 162, 184],          // #17a2b8
+        purple: [111, 66, 193],        // #6f42c1
+        orange: [253, 126, 20],        // #fd7e14
+        gray: [108, 117, 125],         // #6c757d
+        lightGray: [248, 249, 250],    // #f8f9fa
+        white: [255, 255, 255],
+        black: [44, 62, 80]            // #2c3e50
+      };
+
+      // Set up page dimensions and margins
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -166,78 +180,220 @@ const handler = async (req: Request): Promise<Response> => {
       
       let yPosition = margin;
       
-      // Header
-      doc.setFontSize(20);
+      // Enhanced Header with gradient background effect
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, 0, pageWidth, 45, 'F');
+      
+      // Add decorative elements
+      doc.setFillColor(...colors.primaryDark);
+      doc.rect(0, 40, pageWidth, 5, 'F');
+      
+      // Header text
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(24);
       doc.setFont(undefined, 'bold');
-      doc.text(`Daily Sales Report`, pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 10;
+      doc.text('DAILY SALES REPORT', pageWidth / 2, 20, { align: 'center' });
       
       doc.setFontSize(16);
       doc.setFont(undefined, 'normal');
-      doc.text(reportData.merchantName, pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 10;
+      doc.text(reportData.merchantName, pageWidth / 2, 32, { align: 'center' });
       
-      doc.setFontSize(12);
-      doc.text(`Report Date: ${reportData.periodDescription}`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition = 60;
+      
+      // Report metadata section
+      doc.setTextColor(...colors.gray);
+      doc.setFontSize(10);
+      doc.text(`Report Period: ${reportData.periodDescription}`, margin, yPosition);
+      doc.text(`Generated: ${new Date(reportData.generatedAt).toLocaleString()}`, pageWidth - margin, yPosition, { align: 'right' });
       yPosition += 15;
       
-      // Summary section
-      doc.setFontSize(14);
+      // Summary section with colored cards
+      doc.setTextColor(...colors.black);
+      doc.setFontSize(16);
       doc.setFont(undefined, 'bold');
-      doc.text('Summary', margin, yPosition);
-      yPosition += 10;
+      doc.text('📊 PERFORMANCE SUMMARY', margin, yPosition);
+      yPosition += 12;
       
-      doc.setFontSize(11);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Total Sales: $${reportData.totalSales.toFixed(2)}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Commission Paid: $${reportData.totalCommission.toFixed(2)}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Shop Commission: $${reportData.shopCommission.toFixed(2)}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Employee Count: ${reportData.employees.length}`, margin, yPosition);
-      yPosition += 15;
+      // Create summary cards in a 2x2 grid
+      const cardWidth = (contentWidth - 10) / 2;
+      const cardHeight = 25;
+      const cardSpacing = 5;
       
-      // Employee performance table
-      if (reportData.employees.length > 0) {
+      const summaryData = [
+        { label: 'Total Sales', value: `$${reportData.totalSales.toFixed(2)}`, color: colors.success, x: 0, y: 0 },
+        { label: 'Commission Paid', value: `$${reportData.totalCommission.toFixed(2)}`, color: colors.info, x: 1, y: 0 },
+        { label: 'Shop Commission', value: `$${reportData.shopCommission.toFixed(2)}`, color: colors.purple, x: 0, y: 1 },
+        { label: 'Active Employees', value: reportData.employees.length.toString(), color: colors.orange, x: 1, y: 1 }
+      ];
+      
+      summaryData.forEach(card => {
+        const cardX = margin + (card.x * (cardWidth + cardSpacing));
+        const cardY = yPosition + (card.y * (cardHeight + cardSpacing));
+        
+        // Card background
+        doc.setFillColor(...colors.lightGray);
+        doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 2, 2, 'F');
+        
+        // Colored accent bar
+        doc.setFillColor(...card.color);
+        doc.rect(cardX, cardY, cardWidth, 3, 'F');
+        
+        // Card content
+        doc.setTextColor(...colors.gray);
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(card.label.toUpperCase(), cardX + 5, cardY + 12);
+        
+        doc.setTextColor(...card.color);
         doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
-        doc.text('Employee Performance', margin, yPosition);
-        yPosition += 10;
+        doc.text(card.value, cardX + 5, cardY + 20);
+      });
+      
+      yPosition += 60;
+      
+      // Employee Performance Section
+      if (reportData.employees.length > 0) {
+        doc.setTextColor(...colors.black);
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('👥 EMPLOYEE PERFORMANCE', margin, yPosition);
+        yPosition += 15;
         
-        // Table headers
+        // Enhanced table with professional styling
+        const tableStartY = yPosition;
+        const rowHeight = 12;
+        const colWidths = [50, 30, 35, 35, 30];
+        const headers = ['Employee Name', 'ID', 'Total Sales', 'Commission', 'Shop Com.'];
+        
+        // Table header background
+        doc.setFillColor(...colors.primary);
+        doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+        
+        // Header text
+        doc.setTextColor(...colors.white);
         doc.setFontSize(10);
         doc.setFont(undefined, 'bold');
-        const colWidths = [60, 40, 40, 40];
-        const headers = ['Employee Name', 'Sales', 'Commission', 'Date'];
-        let xPosition = margin;
         
+        let xPosition = margin + 2;
         headers.forEach((header, index) => {
-          doc.text(header, xPosition, yPosition);
+          doc.text(header, xPosition, yPosition + 6);
           xPosition += colWidths[index];
         });
         
-        yPosition += 8;
+        yPosition += rowHeight;
         
-        // Table rows
+        // Table rows with alternating colors and performance indicators
+        doc.setTextColor(...colors.black);
         doc.setFont(undefined, 'normal');
-        reportData.employees.forEach((employee: any) => {
-          if (yPosition > pageHeight - 30) {
+        
+        reportData.employees.forEach((employee: any, index: number) => {
+          // Check if we need a new page
+          if (yPosition > pageHeight - 40) {
             doc.addPage();
             yPosition = margin;
+            
+            // Repeat header on new page
+            doc.setFillColor(...colors.primary);
+            doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+            doc.setTextColor(...colors.white);
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            
+            xPosition = margin + 2;
+            headers.forEach((header, i) => {
+              doc.text(header, xPosition, yPosition + 6);
+              xPosition += colWidths[i];
+            });
+            
+            yPosition += rowHeight;
+            doc.setTextColor(...colors.black);
+            doc.setFont(undefined, 'normal');
           }
           
-          xPosition = margin;
-          doc.text(employee.employee_name || employee.employee_id, xPosition, yPosition);
-          xPosition += colWidths[0];
-          doc.text(`$${employee.total_sales.toFixed(2)}`, xPosition, yPosition);
-          xPosition += colWidths[1];
-          doc.text(`$${employee.commission_amount.toFixed(2)}`, xPosition, yPosition);
-          xPosition += colWidths[2];
-          doc.text(employee.sales_date || 'N/A', xPosition, yPosition);
+          // Alternating row colors
+          if (index % 2 === 0) {
+            doc.setFillColor(...colors.lightGray);
+            doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+          }
           
-          yPosition += 6;
+          // Top performer highlighting
+          const isTopPerformer = index < 3 && reportData.employees.length > 3;
+          if (isTopPerformer) {
+            doc.setFillColor(212, 237, 218); // Light green
+            doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+          }
+          
+          // Row data
+          xPosition = margin + 2;
+          doc.setFontSize(9);
+          
+          // Employee name with performance indicator
+          let nameText = employee.employee_name || employee.employee_id;
+          if (nameText.length > 20) nameText = nameText.substring(0, 17) + '...';
+          
+          if (isTopPerformer) {
+            doc.setTextColor(...colors.success);
+            doc.setFont(undefined, 'bold');
+            doc.text('★ ' + nameText, xPosition, yPosition + 6);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(...colors.black);
+          } else {
+            doc.text(nameText, xPosition, yPosition + 6);
+          }
+          xPosition += colWidths[0];
+          
+          // Employee ID
+          doc.setTextColor(...colors.gray);
+          let idText = employee.employee_id.toString();
+          if (idText.length > 12) idText = idText.substring(0, 9) + '...';
+          doc.text(idText, xPosition, yPosition + 6);
+          xPosition += colWidths[1];
+          
+          // Sales amount
+          doc.setTextColor(...colors.success);
+          doc.setFont(undefined, 'bold');
+          doc.text(`$${employee.total_sales.toFixed(0)}`, xPosition, yPosition + 6);
+          doc.setFont(undefined, 'normal');
+          xPosition += colWidths[2];
+          
+          // Commission amount
+          doc.setTextColor(...colors.info);
+          doc.text(`$${employee.commission_amount.toFixed(0)}`, xPosition, yPosition + 6);
+          xPosition += colWidths[3];
+          
+          // Shop commission
+          doc.setTextColor(...colors.purple);
+          const shopCom = employee.total_sales - employee.commission_amount;
+          doc.text(`$${shopCom.toFixed(0)}`, xPosition, yPosition + 6);
+          
+          yPosition += rowHeight;
         });
+        
+        // Table border
+        doc.setDrawColor(...colors.gray);
+        doc.rect(margin, tableStartY - 2, contentWidth, yPosition - tableStartY + 2);
+      }
+      
+      // Footer section
+      const footerY = pageHeight - 25;
+      doc.setFillColor(...colors.lightGray);
+      doc.rect(0, footerY, pageWidth, 25, 'F');
+      
+      doc.setTextColor(...colors.gray);
+      doc.setFontSize(8);
+      doc.text('This report was automatically generated by your Sales Management System', pageWidth / 2, footerY + 8, { align: 'center' });
+      doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth / 2, footerY + 15, { align: 'center' });
+      
+      // Add page numbers if multiple pages
+      const pageCount = doc.internal.getNumberOfPages();
+      if (pageCount > 1) {
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          doc.setTextColor(...colors.gray);
+          doc.setFontSize(8);
+          doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, footerY + 20, { align: 'right' });
+        }
       }
       
       // Convert to buffer
