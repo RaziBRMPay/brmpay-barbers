@@ -60,3 +60,6 @@ verify_jwt = false
 
 [functions.manage-cron-jobs]
 verify_jwt = false
+
+[functions.daily-sales-sync]
+verify_jwt = false

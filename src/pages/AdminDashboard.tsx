@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, Building2, Settings, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Users, Building2, Settings, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
@@ -32,6 +32,7 @@ const AdminDashboard = () => {
   });
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [settingUpCronJobs, setSettingUpCronJobs] = useState(false);
 
   useEffect(() => {
     if (profile?.role === 'admin') {
@@ -98,6 +99,41 @@ const AdminDashboard = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const setupAllMerchantCronJobs = async () => {
+    setSettingUpCronJobs(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-cron-jobs', {
+        body: {
+          action: 'setup_all'
+        }
+      });
+
+      if (error) throw error;
+
+      const results = data?.results || [];
+      const successCount = results.filter((r: any) => r.success).length;
+      const failureCount = results.filter((r: any) => !r.success).length;
+
+      toast({
+        title: 'Cron Jobs Setup Complete',
+        description: `${successCount} cron jobs created successfully${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        variant: failureCount > 0 ? 'destructive' : 'default',
+      });
+
+      console.log('Cron job setup results:', results);
+    } catch (error) {
+      console.error('Error setting up cron jobs:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to setup cron jobs. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSettingUpCronJobs(false);
     }
   };
 
@@ -216,6 +252,15 @@ const AdminDashboard = () => {
                   <TrendingUp className="mr-2 h-4 w-4" />
                   Platform Reports
                 </a>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={setupAllMerchantCronJobs}
+                disabled={settingUpCronJobs}
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                {settingUpCronJobs ? 'Setting up...' : 'Setup All Cron Jobs'}
               </Button>
             </CardContent>
           </Card>
