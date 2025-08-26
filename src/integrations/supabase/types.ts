@@ -195,6 +195,54 @@ export type Database = {
         }
         Relationships: []
       }
+      report_pipeline_status: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          data_period_end: string | null
+          data_period_start: string | null
+          error_message: string | null
+          id: string
+          merchant_id: string
+          pipeline_date: string
+          retry_count: number | null
+          started_at: string | null
+          status: string
+          step_name: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          data_period_end?: string | null
+          data_period_start?: string | null
+          error_message?: string | null
+          id?: string
+          merchant_id: string
+          pipeline_date: string
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          step_name: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          data_period_end?: string | null
+          data_period_start?: string | null
+          error_message?: string | null
+          id?: string
+          merchant_id?: string
+          pipeline_date?: string
+          retry_count?: number | null
+          started_at?: string | null
+          status?: string
+          step_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       reports: {
         Row: {
           created_at: string
@@ -314,25 +362,31 @@ export type Database = {
       settings: {
         Row: {
           created_at: string
+          fetch_delay_minutes: number | null
           id: string
           last_completed_report_cycle_time: string | null
           merchant_id: string
+          report_delay_minutes: number | null
           report_time_cycle: string
           updated_at: string
         }
         Insert: {
           created_at?: string
+          fetch_delay_minutes?: number | null
           id?: string
           last_completed_report_cycle_time?: string | null
           merchant_id: string
+          report_delay_minutes?: number | null
           report_time_cycle?: string
           updated_at?: string
         }
         Update: {
           created_at?: string
+          fetch_delay_minutes?: number | null
           id?: string
           last_completed_report_cycle_time?: string | null
           merchant_id?: string
+          report_delay_minutes?: number | null
           report_time_cycle?: string
           updated_at?: string
         }

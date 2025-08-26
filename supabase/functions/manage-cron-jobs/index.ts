@@ -87,78 +87,169 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 async function createCronJob(supabaseClient: any, merchantId: string, reportTime: string, timezone: string): Promise<Response> {
-  const cronExpression = convertToCronExpression(reportTime, timezone);
-  const jobName = `auto-report-${merchantId}`;
-  
-  console.log(`Creating cron job ${jobName} with expression: ${cronExpression}`);
-  
-  const { error } = await supabaseClient.rpc('create_cron_job', {
-    job_name: jobName,
-    cron_expression: cronExpression,
-    merchant_id: merchantId
-  });
-
-  if (error) {
-    console.error('Error creating cron job:', error);
-    throw new Error(`Failed to create cron job: ${error.message}`);
-  }
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message: `Cron job created for merchant ${merchantId}`,
-      jobName,
-      cronExpression
-    }),
-    {
-      status: 200,
+  try {
+    console.log(`Creating three-step cron jobs for merchant: ${merchantId}`);
+    
+    // Get pipeline settings (fetch and report delays)
+    const { data: settings, error: settingsError } = await supabaseClient
+      .from('settings')
+      .select('fetch_delay_minutes, report_delay_minutes')
+      .eq('merchant_id', merchantId)
+      .single();
+    
+    if (settingsError) {
+      console.error('Failed to fetch settings, using defaults:', settingsError);
+    }
+    
+    const fetchDelay = settings?.fetch_delay_minutes || 1;
+    const reportDelay = settings?.report_delay_minutes || 2;
+    
+    // Generate cron expressions for all three steps
+    const scheduleCronExpression = convertToCronExpression(reportTime, timezone);
+    const fetchCronExpression = convertToCronExpressionWithDelay(reportTime, timezone, fetchDelay);
+    const generateCronExpression = convertToCronExpressionWithDelay(reportTime, timezone, reportDelay);
+    
+    console.log(`Generated cron expressions:`);
+    console.log(`Schedule: ${scheduleCronExpression}`);
+    console.log(`Fetch: ${fetchCronExpression}`);
+    console.log(`Generate: ${generateCronExpression}`);
+    
+    // Create three cron jobs for the pipeline
+    const jobs = [
+      {
+        name: `schedule-data-fetch-${merchantId}`,
+        expression: scheduleCronExpression,
+        function: 'schedule-data-fetch'
+      },
+      {
+        name: `fetch-sales-data-${merchantId}`,
+        expression: fetchCronExpression,
+        function: 'fetch-sales-data'
+      },
+      {
+        name: `generate-report-${merchantId}`,
+        expression: generateCronExpression,
+        function: 'generate-scheduled-report'
+      }
+    ];
+    
+    for (const job of jobs) {
+      const { error } = await supabaseClient.rpc('create_cron_job', {
+        job_name: job.name,
+        cron_expression: job.expression,
+        merchant_id: merchantId
+      });
+      
+      if (error) {
+        throw new Error(`Failed to create ${job.function} cron job: ${error.message}`);
+      }
+      
+      console.log(`Created ${job.function} cron job: ${job.name} with expression: ${job.expression}`);
+    }
+    
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Three-step cron jobs created successfully for merchant ${merchantId}`,
+        jobs: jobs.map(j => ({ name: j.name, expression: j.expression, function: j.function }))
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error(`Error creating cron jobs for merchant ${merchantId}:`, error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
       headers: {
         'Content-Type': 'application/json',
         ...corsHeaders,
       },
-    }
-  );
+    });
+  }
 }
 
 async function updateCronJob(supabaseClient: any, merchantId: string, reportTime: string, timezone: string): Promise<Response> {
-  // Delete the old cron job first
-  await deleteCronJob(supabaseClient, merchantId);
-  
-  // Create a new one with updated settings
-  return await createCronJob(supabaseClient, merchantId, reportTime, timezone);
-}
-
-async function deleteCronJob(supabaseClient: any, merchantId: string): Promise<Response> {
-  const jobName = `auto-report-${merchantId}`;
-  
-  console.log(`Deleting cron job: ${jobName}`);
-  
-  const { error } = await supabaseClient.rpc('delete_cron_job', {
-    job_name: jobName
-  });
-
-  if (error) {
-    console.error('Error deleting cron job:', error);
-    // Don't throw error if job doesn't exist
-    if (!error.message.includes('does not exist')) {
-      throw new Error(`Failed to delete cron job: ${error.message}`);
-    }
-  }
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message: `Cron job deleted for merchant ${merchantId}`,
-      jobName
-    }),
-    {
-      status: 200,
+  try {
+    console.log(`Updating three-step cron jobs for merchant: ${merchantId}`);
+    
+    // Delete the old cron jobs first
+    await deleteCronJob(supabaseClient, merchantId);
+    
+    // Create new ones with updated settings
+    return await createCronJob(supabaseClient, merchantId, reportTime, timezone);
+  } catch (error: any) {
+    console.error(`Error updating cron jobs for merchant ${merchantId}:`, error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
       headers: {
         'Content-Type': 'application/json',
         ...corsHeaders,
       },
+    });
+  }
+}
+
+async function deleteCronJob(supabaseClient: any, merchantId: string): Promise<Response> {
+  try {
+    console.log(`Deleting three-step cron jobs for merchant: ${merchantId}`);
+    
+    const jobNames = [
+      `schedule-data-fetch-${merchantId}`,
+      `fetch-sales-data-${merchantId}`,
+      `generate-report-${merchantId}`,
+      `auto-report-${merchantId}` // Also delete old format job if it exists
+    ];
+    
+    for (const jobName of jobNames) {
+      const { error } = await supabaseClient.rpc('delete_cron_job', {
+        job_name: jobName
+      });
+      
+      if (error) {
+        console.warn(`Failed to delete cron job ${jobName}: ${error.message}`);
+      } else {
+        console.log(`Deleted cron job: ${jobName}`);
+      }
     }
-  );
+    
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `All cron jobs deleted successfully for merchant ${merchantId}`,
+        deletedJobs: jobNames
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      }
+    );
+  } catch (error: any) {
+    console.error(`Error deleting cron jobs for merchant ${merchantId}:`, error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        ...corsHeaders,
+      },
+    });
+  }
 }
 
 async function getCronJobStatus(supabaseClient: any, merchantId: string): Promise<Response> {
@@ -390,6 +481,46 @@ function convertToCronExpression(reportTime: string, timezone: string): string {
   console.log(`Generated cron expression: ${cronExpr}`);
   
   return cronExpr;
+}
+
+function convertToCronExpressionWithDelay(reportTime: string, timezone: string, delayMinutes: number): string {
+  console.log(`Converting ${reportTime} in ${timezone} to UTC with ${delayMinutes} minute delay`);
+  
+  // Parse the time (format: HH:MM:SS)
+  const [hours, minutes] = reportTime.split(':').map(Number);
+  
+  // Add delay minutes
+  let totalMinutes = minutes + delayMinutes;
+  let adjustedHours = hours;
+  
+  // Handle minute rollover
+  if (totalMinutes >= 60) {
+    adjustedHours += Math.floor(totalMinutes / 60);
+    totalMinutes = totalMinutes % 60;
+  }
+  
+  // Get timezone offset
+  const offset = getTimezoneOffset(timezone);
+  console.log(`Local hours: ${adjustedHours}, Minutes: ${totalMinutes}, Timezone offset: ${offset}`);
+  
+  // Convert to UTC
+  let utcHours = adjustedHours + Math.abs(offset);
+  console.log(`UTC hours before rollover: ${utcHours}`);
+  
+  // Handle day rollover
+  if (utcHours >= 24) {
+    utcHours -= 24;
+  } else if (utcHours < 0) {
+    utcHours += 24;
+  }
+  
+  console.log(`Final UTC hours: ${utcHours}, Minutes: ${totalMinutes}`);
+  
+  // Create cron expression (minute hour * * *)
+  const cronExpression = `${totalMinutes} ${utcHours} * * *`;
+  console.log(`Generated delayed cron expression: ${cronExpression}`);
+  
+  return cronExpression;
 }
 
 serve(handler);

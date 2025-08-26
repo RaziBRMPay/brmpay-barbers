@@ -63,3 +63,12 @@ verify_jwt = false
 
 [functions.daily-sales-sync]
 verify_jwt = false
+
+[functions.schedule-data-fetch]
+verify_jwt = false
+
+[functions.fetch-sales-data]
+verify_jwt = false
+
+[functions.generate-scheduled-report]
+verify_jwt = false
