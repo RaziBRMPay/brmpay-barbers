@@ -134,10 +134,11 @@ async function createCronJob(supabaseClient: any, merchantId: string, reportTime
     ];
     
     for (const job of jobs) {
-      const { error } = await supabaseClient.rpc('create_cron_job', {
+      const { error } = await supabaseClient.rpc('create_cron_job_pipeline', {
         job_name: job.name,
         cron_expression: job.expression,
-        merchant_id: merchantId
+        merchant_id: merchantId,
+        function_name: job.function
       });
       
       if (error) {
@@ -253,9 +254,7 @@ async function deleteCronJob(supabaseClient: any, merchantId: string): Promise<R
 }
 
 async function getCronJobStatus(supabaseClient: any, merchantId: string): Promise<Response> {
-  const jobName = `auto-report-${merchantId}`;
-  
-  console.log(`Getting status for cron job: ${jobName}`);
+  console.log(`Getting status for three-step cron jobs for merchant: ${merchantId}`);
   
   try {
     // Get merchant settings to determine current configuration
@@ -264,6 +263,8 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
       .select(`
         report_time_cycle,
         last_completed_report_cycle_time,
+        fetch_delay_minutes,
+        report_delay_minutes,
         merchants!inner (
           timezone,
           shop_name
@@ -279,7 +280,14 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
 
     const timezone = settings.merchants.timezone;
     const reportTime = settings.report_time_cycle;
-    const cronExpression = convertToCronExpression(reportTime, timezone);
+    
+    // Generate all three cron expressions
+    const fetchDelay = settings.fetch_delay_minutes || 1;
+    const reportDelay = settings.report_delay_minutes || 2;
+    
+    const scheduleCronExpression = convertToCronExpression(reportTime, timezone);
+    const fetchCronExpression = convertToCronExpressionWithDelay(reportTime, timezone, fetchDelay);
+    const generateCronExpression = convertToCronExpressionWithDelay(reportTime, timezone, reportDelay);
     
     // Calculate next run time in the merchant's local timezone
     const [hours, minutes] = reportTime.split(':').map(Number);
@@ -288,42 +296,41 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
     // Get the current timezone offset for DST handling
     const timezoneOffset = getTimezoneOffset(timezone, now);
     
-    // Create a date representing the report time in the merchant's timezone
-    // We need to create a UTC time that, when converted to the merchant's timezone, shows the correct local time
-    const nextRun = new Date();
-    
-    // Set the UTC time such that when converted to the merchant's timezone, it shows the desired local time
-    // If we want 9 PM Eastern (UTC-4), we need to set UTC to 1 AM next day (9 PM + 4 hours)
-    nextRun.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
+    // Create a display time that represents the local time in merchant's timezone
+    const nextRunTime = new Date();
+    nextRunTime.setHours(hours, minutes, 0, 0);
     
     // If the local time has passed today, move to tomorrow
-    const localTime = new Date();
-    localTime.setHours(hours, minutes, 0, 0);
-    
-    if (localTime <= now) {
-      nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-    }
-    
-    // For display purposes, we want to show the local time (not UTC time)
-    // Create a display time that represents the local time in merchant's timezone
-    const displayTime = new Date();
-    displayTime.setUTCHours(hours - timezoneOffset, minutes, 0, 0);
-    if (displayTime <= now) {
-      displayTime.setUTCDate(displayTime.getUTCDate() + 1);
+    if (nextRunTime <= now) {
+      nextRunTime.setDate(nextRunTime.getDate() + 1);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         status: {
-          jobName,
-          cronExpression,
+          jobName: `schedule-data-fetch-${merchantId}`,
+          cronExpression: scheduleCronExpression,
           isConfigured: true,
-          nextRunTime: displayTime.toISOString(),
+          nextRunTime: nextRunTime.toISOString(),
           lastCompletedRun: settings.last_completed_report_cycle_time,
           reportTime: reportTime,
           timezone: timezone,
-          shopName: settings.merchants.shop_name
+          shopName: settings.merchants.shop_name,
+          pipeline: {
+            schedule: {
+              jobName: `schedule-data-fetch-${merchantId}`,
+              cronExpression: scheduleCronExpression
+            },
+            fetch: {
+              jobName: `fetch-sales-data-${merchantId}`,
+              cronExpression: fetchCronExpression
+            },
+            generate: {
+              jobName: `generate-report-${merchantId}`,
+              cronExpression: generateCronExpression
+            }
+          }
         }
       }),
       {
@@ -339,7 +346,7 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
       JSON.stringify({
         success: false,
         status: {
-          jobName,
+          jobName: `schedule-data-fetch-${merchantId}`,
           isConfigured: false,
           error: error.message
         }
@@ -356,7 +363,7 @@ async function getCronJobStatus(supabaseClient: any, merchantId: string): Promis
 }
 
 async function setupAllMerchantCronJobs(supabaseClient: any): Promise<Response> {
-  console.log('Setting up cron jobs for all merchants');
+  console.log('Setting up three-step cron jobs for all merchants');
   
   // Get all merchants with their settings
   const { data: settings, error: settingsError } = await supabaseClient
@@ -364,6 +371,8 @@ async function setupAllMerchantCronJobs(supabaseClient: any): Promise<Response> 
     .select(`
       merchant_id,
       report_time_cycle,
+      fetch_delay_minutes,
+      report_delay_minutes,
       merchants!inner (
         id,
         shop_name,
@@ -385,39 +394,41 @@ async function setupAllMerchantCronJobs(supabaseClient: any): Promise<Response> 
       const timezone = setting.merchants.timezone;
       const shopName = setting.merchants.shop_name;
       
-      console.log(`Setting up cron job for ${shopName} (${merchantId})`);
+      console.log(`Setting up three-step cron jobs for ${shopName} (${merchantId})`);
       
-      const cronExpression = convertToCronExpression(reportTime, timezone);
-      const jobName = `auto-report-${merchantId}`;
+      // Delete all old jobs first (both old and new formats)
+      const oldJobNames = [
+        `auto-report-${merchantId}`,
+        `schedule-data-fetch-${merchantId}`,
+        `fetch-sales-data-${merchantId}`,
+        `generate-report-${merchantId}`
+      ];
       
-      // Delete existing job if it exists (to avoid duplicates)
-      await supabaseClient.rpc('delete_cron_job', {
-        job_name: jobName
-      });
-      
-      // Create new cron job
-      const { error } = await supabaseClient.rpc('create_cron_job', {
-        job_name: jobName,
-        cron_expression: cronExpression,
-        merchant_id: merchantId
-      });
-
-      if (error) {
-        console.error(`Error creating cron job for ${shopName}:`, error);
-        results.push({
-          merchantId,
-          shopName,
-          success: false,
-          error: error.message
+      for (const jobName of oldJobNames) {
+        await supabaseClient.rpc('delete_cron_job', {
+          job_name: jobName
         });
-      } else {
-        console.log(`Successfully created cron job for ${shopName}`);
+      }
+      
+      // Now create the new three-step pipeline using the createCronJob function
+      const createResponse = await createCronJob(supabaseClient, merchantId, reportTime, timezone);
+      
+      if (createResponse.status === 200) {
+        console.log(`Successfully created three-step cron jobs for ${shopName}`);
         results.push({
           merchantId,
           shopName,
           success: true,
-          jobName,
-          cronExpression
+          message: `Three-step cron jobs created successfully`
+        });
+      } else {
+        const errorData = await createResponse.json();
+        console.error(`Error creating cron jobs for ${shopName}:`, errorData);
+        results.push({
+          merchantId,
+          shopName,
+          success: false,
+          error: errorData.error || 'Unknown error'
         });
       }
     } catch (error: any) {

@@ -445,6 +445,15 @@ export type Database = {
         Args: { cron_expression: string; job_name: string; merchant_id: string }
         Returns: undefined
       }
+      create_cron_job_pipeline: {
+        Args: {
+          cron_expression: string
+          function_name: string
+          job_name: string
+          merchant_id: string
+        }
+        Returns: undefined
+      }
       delete_cron_job: {
         Args: { job_name: string }
         Returns: undefined
