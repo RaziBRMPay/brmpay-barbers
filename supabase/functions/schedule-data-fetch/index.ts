@@ -39,11 +39,22 @@ const calculateReportPeriods = (reportTime: string, timezone: string, currentDat
   const previousReportCycle = new Date(currentReportCycle);
   previousReportCycle.setDate(previousReportCycle.getDate() - 1);
   
-  // Convert to UTC
+  // Convert to UTC (subtract offset because US timezones are UTC-X)
   const timezoneOffset = getTimezoneOffset(timezone, currentDate);
   
+  // Convert local time to UTC by adding the offset hours
   const previousReportCycleUTC = new Date(previousReportCycle.getTime() + (timezoneOffset * 60 * 60 * 1000));
   const currentReportCycleUTC = new Date(currentReportCycle.getTime() + (timezoneOffset * 60 * 60 * 1000));
+  
+  // Debug logging for verification
+  console.log(`Report period calculation for ${timezone}:`, {
+    reportTime,
+    localPrevious: previousReportCycle.toISOString(),
+    localCurrent: currentReportCycle.toISOString(),
+    utcPrevious: previousReportCycleUTC.toISOString(),
+    utcCurrent: currentReportCycleUTC.toISOString(),
+    offsetHours: timezoneOffset
+  });
   
   return {
     start: previousReportCycleUTC.toISOString(),
