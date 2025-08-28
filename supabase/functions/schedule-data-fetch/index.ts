@@ -6,6 +6,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Timezone offset mapping with DST awareness
+const getTimezoneOffset = (timezone: string, date = new Date()): number => {
+  const isDST = (date: Date): boolean => {
+    const year = date.getFullYear();
+    const marchSecondSunday = new Date(year, 2, 14 - new Date(year, 2, 1).getDay());
+    const novFirstSunday = new Date(year, 10, 7 - new Date(year, 10, 1).getDay());
+    return date >= marchSecondSunday && date < novFirstSunday;
+  };
+
+  const offsets = {
+    'US/Eastern': isDST(date) ? 4 : 5,
+    'US/Central': isDST(date) ? 5 : 6,
+    'US/Mountain': isDST(date) ? 6 : 7,
+    'US/Pacific': isDST(date) ? 7 : 8,
+    'US/Alaska': isDST(date) ? 8 : 9,
+    'US/Hawaii': 10 // Hawaii doesn't observe DST
+  };
+
+  return offsets[timezone as keyof typeof offsets] || 4; // Default to Eastern
+};
+
+// Calculate report cycle periods for a merchant
+const calculateReportPeriods = (reportTime: string, timezone: string, currentDate = new Date()) => {
+  const [hours, minutes] = reportTime.split(':').map(Number);
+  
+  // Calculate current report cycle time in merchant's timezone
+  const currentReportCycle = new Date(currentDate);
+  currentReportCycle.setHours(hours, minutes, 0, 0);
+  
+  // Calculate previous report cycle time (24 hours before)
+  const previousReportCycle = new Date(currentReportCycle);
+  previousReportCycle.setDate(previousReportCycle.getDate() - 1);
+  
+  // Convert to UTC
+  const timezoneOffset = getTimezoneOffset(timezone, currentDate);
+  
+  const previousReportCycleUTC = new Date(previousReportCycle.getTime() + (timezoneOffset * 60 * 60 * 1000));
+  const currentReportCycleUTC = new Date(currentReportCycle.getTime() + (timezoneOffset * 60 * 60 * 1000));
+  
+  return {
+    start: previousReportCycleUTC.toISOString(),
+    end: currentReportCycleUTC.toISOString()
+  };
+};
+
 const handler = async (req: Request): Promise<Response> => {
   console.log('Schedule Data Fetch function called');
 
@@ -29,16 +74,27 @@ const handler = async (req: Request): Promise<Response> => {
     // Get current date for pipeline tracking
     const currentDate = new Date().toISOString().split('T')[0];
 
-    // Get merchant settings and last report time
+    // Get merchant settings and timezone
     const { data: settings, error: settingsError } = await supabaseClient
       .from('settings')
-      .select('*')
+      .select('*, merchants!inner(timezone)')
       .eq('merchant_id', merchantId)
       .single();
 
     if (settingsError) {
       throw new Error(`Failed to fetch merchant settings: ${settingsError.message}`);
     }
+
+    // Calculate dynamic report periods based on merchant's report time cycle and timezone
+    const merchantTimezone = settings.merchants.timezone;
+    const reportTime = settings.report_time_cycle;
+    const reportPeriods = calculateReportPeriods(reportTime, merchantTimezone);
+    
+    console.log(`Calculated report periods for merchant ${merchantId}:`, {
+      timezone: merchantTimezone,
+      reportTime,
+      periods: reportPeriods
+    });
 
     // Create pipeline status record for the schedule step
     const { error: pipelineError } = await supabaseClient
@@ -49,8 +105,8 @@ const handler = async (req: Request): Promise<Response> => {
         step_name: 'schedule',
         status: 'completed',
         completed_at: new Date().toISOString(),
-        data_period_start: settings.last_completed_report_cycle_time || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        data_period_end: new Date().toISOString()
+        data_period_start: reportPeriods.start,
+        data_period_end: reportPeriods.end
       });
 
     if (pipelineError) {
@@ -65,8 +121,8 @@ const handler = async (req: Request): Promise<Response> => {
         pipeline_date: currentDate,
         step_name: 'fetch',
         status: 'pending',
-        data_period_start: settings.last_completed_report_cycle_time || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        data_period_end: new Date().toISOString()
+        data_period_start: reportPeriods.start,
+        data_period_end: reportPeriods.end
       });
 
     if (fetchPipelineError) {
