@@ -31,13 +31,19 @@ const getTimezoneOffset = (timezone: string, date = new Date()): number => {
 const calculateReportPeriods = (reportTime: string, timezone: string, currentDate = new Date()) => {
   const [hours, minutes] = reportTime.split(':').map(Number);
   
-  // Calculate current report cycle time in merchant's timezone
-  const currentReportCycle = new Date(currentDate);
-  currentReportCycle.setHours(hours, minutes, 0, 0);
+  // Create today's report time in merchant's local timezone
+  const todayReportTime = new Date(currentDate);
+  todayReportTime.setHours(hours, minutes, 0, 0);
   
-  // Calculate previous report cycle time (24 hours before)
-  const previousReportCycle = new Date(currentReportCycle);
-  previousReportCycle.setDate(previousReportCycle.getDate() - 1);
+  // Determine which report cycle we're calculating for
+  // If current time is after today's report time, the current cycle is today's report time
+  // If current time is before today's report time, the current cycle is yesterday's report time
+  const currentReportCycle = currentDate >= todayReportTime 
+    ? todayReportTime 
+    : new Date(todayReportTime.getTime() - 24 * 60 * 60 * 1000);
+  
+  // Previous report cycle is always 24 hours before current cycle
+  const previousReportCycle = new Date(currentReportCycle.getTime() - 24 * 60 * 60 * 1000);
   
   // Convert to UTC (subtract offset because US timezones are UTC-X)
   const timezoneOffset = getTimezoneOffset(timezone, currentDate);
