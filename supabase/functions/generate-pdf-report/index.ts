@@ -18,6 +18,7 @@ interface ReportRequest {
   reportDate?: string; // Keep for backward compatibility
   reportType?: string;
   businessDayEnd?: string;
+  salesData?: any[]; // Pre-fetched sales data from scheduler
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -42,53 +43,80 @@ const handler = async (req: Request): Promise<Response> => {
       endDateTime, 
       reportDate, 
       reportType = 'daily_sales',
-      businessDayEnd
+      businessDayEnd,
+      salesData: providedSalesData
     } = requestBody as ReportRequest;
 
-    // Use datetime range if provided, otherwise fall back to date-based query
-    let salesQuery = supabaseClient
-      .from('employee_sales_data')
-      .select(`
-        employee_id,
-        employee_name,
-        total_sales,
-        commission_amount,
-        sales_date,
-        created_at
-      `)
-      .eq('merchant_id', merchantId);
-
+    let salesData: any[] = [];
     let periodDescription: string;
     let actualReportDate: string;
     
-    if (startDateTime && endDateTime) {
-      console.log(`Generating report for merchant ${merchantId} for period ${startDateTime} to ${endDateTime}`);
+    // Use provided sales data if available (from scheduled reports)
+    if (providedSalesData && providedSalesData.length > 0) {
+      console.log(`Using provided sales data for merchant ${merchantId} (${providedSalesData.length} records)`);
+      salesData = providedSalesData;
       
-      // Use datetime range for precise querying
-      salesQuery = salesQuery
-        .gte('created_at', startDateTime)
-        .lt('created_at', endDateTime);
-        
-      const startDate = new Date(startDateTime);
-      const endDate = new Date(endDateTime);
-      periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
-      actualReportDate = businessDayEnd ? businessDayEnd.split('T')[0] : endDateTime.split('T')[0];
-    } else if (reportDate) {
-      console.log(`Generating report for merchant ${merchantId} for date ${reportDate}`);
-      
-      // Fall back to date-based query for backward compatibility
-      salesQuery = salesQuery.eq('sales_date', reportDate);
-      periodDescription = new Date(reportDate).toLocaleDateString();
-      actualReportDate = reportDate;
+      // Calculate period description from provided data
+      if (startDateTime && endDateTime) {
+        const startDate = new Date(startDateTime);
+        const endDate = new Date(endDateTime);
+        periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
+        actualReportDate = businessDayEnd ? businessDayEnd.split('T')[0] : endDateTime.split('T')[0];
+      } else if (reportDate) {
+        periodDescription = new Date(reportDate).toLocaleDateString();
+        actualReportDate = reportDate;
+      } else {
+        // Fallback for provided data without explicit dates - use current date
+        actualReportDate = new Date().toISOString().split('T')[0];
+        periodDescription = new Date(actualReportDate).toLocaleDateString();
+      }
     } else {
-      throw new Error('Either startDateTime/endDateTime or reportDate must be provided');
-    }
+      // Query database for sales data (manual report generation or fallback)
+      console.log(`Querying database for sales data for merchant ${merchantId}`);
+      
+      let salesQuery = supabaseClient
+        .from('employee_sales_data')
+        .select(`
+          employee_id,
+          employee_name,
+          total_sales,
+          commission_amount,
+          sales_date,
+          created_at
+        `)
+        .eq('merchant_id', merchantId);
+      
+      if (startDateTime && endDateTime) {
+        console.log(`Generating report for merchant ${merchantId} for period ${startDateTime} to ${endDateTime}`);
+        
+        // Use datetime range for precise querying
+        salesQuery = salesQuery
+          .gte('created_at', startDateTime)
+          .lt('created_at', endDateTime);
+          
+        const startDate = new Date(startDateTime);
+        const endDate = new Date(endDateTime);
+        periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
+        actualReportDate = businessDayEnd ? businessDayEnd.split('T')[0] : endDateTime.split('T')[0];
+      } else if (reportDate) {
+        console.log(`Generating report for merchant ${merchantId} for date ${reportDate}`);
+        
+        // Fall back to date-based query for backward compatibility
+        salesQuery = salesQuery.eq('sales_date', reportDate);
+        periodDescription = new Date(reportDate).toLocaleDateString();
+        actualReportDate = reportDate;
+      } else {
+        throw new Error('Either startDateTime/endDateTime or reportDate must be provided');
+      }
 
-    const { data: salesData, error: salesError } = await salesQuery.order('total_sales', { ascending: false });
+      const { data: queriedSalesData, error: salesError } = await salesQuery.order('total_sales', { ascending: false });
 
-    if (salesError) {
-      console.error('Error fetching sales data:', salesError);
-      throw new Error(`Failed to fetch sales data: ${salesError.message}`);
+      if (salesError) {
+        console.error('Error fetching sales data:', salesError);
+        throw new Error(`Failed to fetch sales data: ${salesError.message}`);
+      }
+      
+      salesData = queriedSalesData || [];
     }
 
     // Fetch merchant information
