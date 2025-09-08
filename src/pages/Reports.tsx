@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,10 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { FileText, Download, Calendar, Loader2, RefreshCw, TestTube, Play } from 'lucide-react';
+import { FileText, Download, Calendar, Loader2, RefreshCw, TestTube, Play, Grid, List } from 'lucide-react';
 import { format } from 'date-fns';
+import { DateRange } from 'react-day-picker';
 import ReportStatusMonitor from '@/components/ReportStatusMonitor';
 import ReportNotificationSystem from '@/components/ReportNotificationSystem';
+import { ReportsTable } from '@/components/reports/ReportsTable';
+import { ReportFilters } from '@/components/reports/ReportFilters';
+import { ReportPreviewModal } from '@/components/reports/ReportPreviewModal';
+import { BulkActionToolbar } from '@/components/reports/BulkActionToolbar';
 
 interface Report {
   id: string;
@@ -34,6 +39,76 @@ const Reports = () => {
   const [reports, setReports] = useState<Report[]>([]);
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [testingScheduler, setTestingScheduler] = useState(false);
+  
+  // Enhanced UI state
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [reportTypeFilter, setReportTypeFilter] = useState('all');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedReports, setSelectedReports] = useState<string[]>([]);
+  const [previewReport, setPreviewReport] = useState<Report | null>(null);
+
+  // Filter and search functionality
+  const filteredReports = useMemo(() => {
+    return reports.filter(report => {
+      // Search filter
+      const matchesSearch = searchTerm === '' || 
+        report.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        report.report_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        report.id.includes(searchTerm);
+
+      // Type filter  
+      const matchesType = reportTypeFilter === 'all' || report.report_type === reportTypeFilter;
+
+      // Date range filter
+      const matchesDateRange = !dateRange?.from || !dateRange?.to || 
+        (new Date(report.report_date) >= dateRange.from && new Date(report.report_date) <= dateRange.to);
+
+      return matchesSearch && matchesType && matchesDateRange;
+    });
+  }, [reports, searchTerm, reportTypeFilter, dateRange]);
+
+  const hasActiveFilters = searchTerm !== '' || reportTypeFilter !== 'all' || !!dateRange?.from;
+
+  // Selection handlers
+  const handleSelectReport = useCallback((reportId: string) => {
+    setSelectedReports(prev => 
+      prev.includes(reportId) 
+        ? prev.filter(id => id !== reportId)
+        : [...prev, reportId]
+    );
+  }, []);
+
+  const handleSelectAll = useCallback((selected: boolean) => {
+    setSelectedReports(selected ? filteredReports.map(r => r.id) : []);
+  }, [filteredReports]);
+
+  const clearFilters = useCallback(() => {
+    setSearchTerm('');
+    setReportTypeFilter('all');
+    setDateRange(undefined);
+  }, []);
+
+  // Bulk actions
+  const handleDownloadSelected = useCallback(async () => {
+    const selectedReportObjects = reports.filter(r => selectedReports.includes(r.id) && r.file_url);
+    
+    if (selectedReportObjects.length === 0) {
+      toast({
+        title: 'No files to download',
+        description: 'Selected reports do not have available files.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Download each report
+    for (const report of selectedReportObjects) {
+      await downloadReport(report);
+    }
+    
+    setSelectedReports([]);
+  }, [selectedReports, reports]);
 
   useEffect(() => {
     if (profile?.role === 'merchant') {
@@ -259,7 +334,7 @@ const Reports = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-6">
         {/* Header */}
         <div className="bg-gradient-card rounded-2xl p-6 shadow-soft border">
           <div className="flex items-center justify-between">
@@ -274,105 +349,168 @@ const Reports = () => {
                 </p>
               </div>
             </div>
-            <Button
-              onClick={testScheduler}
-              disabled={testingScheduler}
-              variant="outline"
-              className="hover:shadow-soft transition-all duration-300"
-            >
-              {testingScheduler ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <TestTube className="h-4 w-4 mr-2" />
-              )}
-              Test Scheduler
-            </Button>
+            <div className="flex items-center gap-3">
+              {/* View Mode Toggle */}
+              <div className="flex border rounded-lg overflow-hidden">
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="rounded-none"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="rounded-none"
+                >
+                  <Grid className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <Button
+                onClick={testScheduler}
+                disabled={testingScheduler}
+                variant="outline"
+                className="hover:shadow-soft transition-all duration-300"
+              >
+                {testingScheduler ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <TestTube className="h-4 w-4 mr-2" />
+                )}
+                Test Scheduler
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Reports List */}
+        {/* Filters */}
+        <ReportFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          reportTypeFilter={reportTypeFilter}
+          onReportTypeChange={setReportTypeFilter}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          onClearFilters={clearFilters}
+          hasActiveFilters={hasActiveFilters}
+        />
+
+        {/* Bulk Actions */}
+        <BulkActionToolbar
+          selectedCount={selectedReports.length}
+          onDownloadSelected={handleDownloadSelected}
+          onClearSelection={() => setSelectedReports([])}
+        />
+
+        {/* Reports Content */}
         <Card className="shadow-soft border-0 bg-gradient-card">
           <CardHeader>
-            <CardTitle>Available Reports</CardTitle>
-            <CardDescription>
-              Automated reports are generated at the end of each report cycle
-            </CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Available Reports</CardTitle>
+                <CardDescription>
+                  {filteredReports.length} of {reports.length} reports
+                  {hasActiveFilters && ' (filtered)'}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {reports.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No reports available</h3>
-                <p className="text-muted-foreground mb-4">
-                  Reports will appear here once they are automatically generated at the end of each report cycle.
-                </p>
-                <div className="bg-muted/50 rounded-lg p-4 max-w-md mx-auto">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Note:</strong> Report generation is triggered automatically based on your configured report cycle time in Settings.
-                  </p>
-                </div>
-              </div>
+            {viewMode === 'table' ? (
+              <ReportsTable
+                reports={filteredReports}
+                loading={loading}
+                onDownload={downloadReport}
+                onRegenerate={regenerateReport}
+                onPreview={setPreviewReport}
+                regenerating={regenerating}
+                selectedReports={selectedReports}
+                onSelectReport={handleSelectReport}
+                onSelectAll={handleSelectAll}
+              />
             ) : (
+              // Legacy grid view for backward compatibility
               <div className="space-y-4">
-                {reports.map((report) => (
-                  <div
-                    key={report.id}
-                    className="flex items-center justify-between p-4 border rounded-lg bg-background/50 hover:bg-background/70 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-primary/10 rounded-lg p-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-medium text-foreground">
-                            {report.file_name || `Report ${report.id.slice(0, 8)}`}
-                          </h4>
-                          <Badge variant={getReportTypeBadgeVariant(report.report_type)}>
-                            {getReportTypeLabel(report.report_type)}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                          <span>
-                               Report Date: {format(new Date(report.report_date), 'MM/dd/yyyy')}
-                             </span>
-                          </div>
-                           <span>Generated: {format(new Date(report.created_at), 'MM/dd/yyyy HH:mm')}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!report.file_url && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => regenerateReport(report)}
-                          disabled={regenerating === report.id}
-                          className="hover:shadow-soft transition-all duration-300"
-                        >
-                          {regenerating === report.id ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                          )}
-                          Generate PDF
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadReport(report)}
-                        disabled={!report.file_url}
-                        className="hover:shadow-soft transition-all duration-300"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
-                    </div>
+                {filteredReports.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      {hasActiveFilters ? 'No reports match your filters' : 'No reports available'}
+                    </h3>
+                    <p className="text-muted-foreground mb-4">
+                      {hasActiveFilters 
+                        ? 'Try adjusting your search terms or filters.' 
+                        : 'Reports will appear here once they are automatically generated.'
+                      }
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-4">
+                    {filteredReports.map((report) => (
+                      <div
+                        key={report.id}
+                        className="flex items-center justify-between p-4 border rounded-lg bg-background/50 hover:bg-background/70 transition-colors"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <div className="bg-primary/10 rounded-lg p-2">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-medium text-foreground">
+                                {report.file_name || `Report ${report.id.slice(0, 8)}`}
+                              </h4>
+                              <Badge variant={getReportTypeBadgeVariant(report.report_type)}>
+                                {getReportTypeLabel(report.report_type)}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                <span>
+                                  Report Date: {format(new Date(report.report_date), 'MM/dd/yyyy')}
+                                </span>
+                              </div>
+                              <span>Generated: {format(new Date(report.created_at), 'MM/dd/yyyy HH:mm')}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {!report.file_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => regenerateReport(report)}
+                              disabled={regenerating === report.id}
+                              className="hover:shadow-soft transition-all duration-300"
+                            >
+                              {regenerating === report.id ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                              )}
+                              Generate PDF
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => downloadReport(report)}
+                            disabled={!report.file_url}
+                            className="hover:shadow-soft transition-all duration-300"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -416,13 +554,21 @@ const Reports = () => {
             </div>
             <div className="bg-muted/50 rounded-lg p-4">
               <p className="text-sm text-muted-foreground">
-                <strong>💡 Tip:</strong> Report generation time can be configured in your Settings page. 
-                Reports are stored securely and available for download at any time.
+                <strong>💡 Tip:</strong> Use the search and filter options above to quickly find specific reports. 
+                You can also select multiple reports for bulk download operations.
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Preview Modal */}
+      <ReportPreviewModal
+        report={previewReport}
+        isOpen={!!previewReport}
+        onClose={() => setPreviewReport(null)}
+        onDownload={downloadReport}
+      />
     </DashboardLayout>
   );
 };
