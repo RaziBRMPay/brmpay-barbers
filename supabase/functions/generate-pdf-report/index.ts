@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
 import jsPDF from "https://esm.sh/jspdf@2.5.1";
+import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0";
+import { format } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,16 +60,20 @@ const handler = async (req: Request): Promise<Response> => {
       
       // Calculate period description from provided data
       if (startDateTime && endDateTime) {
+        const merchantTimezone = merchantData?.timezone || 'America/New_York';
         const startDate = new Date(startDateTime);
         const endDate = new Date(endDateTime);
         periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
-        actualReportDate = businessDayEnd ? businessDayEnd.split('T')[0] : endDateTime.split('T')[0];
+        // Use merchant timezone for report date calculation
+        actualReportDate = businessDayEnd ? getLocalReportDate(businessDayEnd, merchantTimezone) : getLocalReportDate(endDateTime, merchantTimezone);
       } else if (reportDate) {
         periodDescription = new Date(reportDate).toLocaleDateString();
         actualReportDate = reportDate;
       } else {
-        // Fallback for provided data without explicit dates - use current date
-        actualReportDate = new Date().toISOString().split('T')[0];
+        // Fallback for provided data without explicit dates - use current date in merchant timezone
+        const merchantTimezone = merchantData?.timezone || 'America/New_York';
+        const now = new Date().toISOString();
+        actualReportDate = getLocalReportDate(now, merchantTimezone);
         periodDescription = new Date(actualReportDate).toLocaleDateString();
       }
     } else {
@@ -94,10 +100,12 @@ const handler = async (req: Request): Promise<Response> => {
           .gte('created_at', startDateTime)
           .lt('created_at', endDateTime);
           
+        const merchantTimezone = merchantData?.timezone || 'America/New_York';
         const startDate = new Date(startDateTime);
         const endDate = new Date(endDateTime);
         periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
-        actualReportDate = businessDayEnd ? businessDayEnd.split('T')[0] : endDateTime.split('T')[0];
+        // Use merchant timezone for report date calculation
+        actualReportDate = businessDayEnd ? getLocalReportDate(businessDayEnd, merchantTimezone) : getLocalReportDate(endDateTime, merchantTimezone);
       } else if (reportDate) {
         console.log(`Generating report for merchant ${merchantId} for date ${reportDate}`);
         
@@ -125,6 +133,18 @@ const handler = async (req: Request): Promise<Response> => {
       .select('shop_name, timezone')
       .eq('id', merchantId)
       .single();
+
+    if (merchantError) {
+      console.error('Error fetching merchant data:', merchantError);
+      throw new Error(`Failed to fetch merchant data: ${merchantError.message}`);
+    }
+
+    // Helper function to convert UTC date to merchant timezone date
+    const getLocalReportDate = (utcDateTime: string, timezone: string = 'America/New_York'): string => {
+      const utcDate = new Date(utcDateTime);
+      const zonedDate = toZonedTime(utcDate, timezone);
+      return format(zonedDate, 'yyyy-MM-dd');
+    };
 
     if (merchantError) {
       console.error('Error fetching merchant data:', merchantError);
