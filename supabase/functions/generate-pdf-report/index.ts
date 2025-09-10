@@ -186,18 +186,27 @@ const handler = async (req: Request): Promise<Response> => {
         format: 'a4'
       });
 
-      // Professional color palette (HSL converted to RGB for jsPDF)
+      // Enhanced professional color palette with gradients
       const colors = {
-        primary: [102, 126, 234],      // #667eea
-        primaryDark: [118, 75, 162],   // #764ba2
-        success: [40, 167, 69],        // #28a745
-        info: [23, 162, 184],          // #17a2b8
-        purple: [111, 66, 193],        // #6f42c1
-        orange: [253, 126, 20],        // #fd7e14
-        gray: [108, 117, 125],         // #6c757d
-        lightGray: [248, 249, 250],    // #f8f9fa
+        primary: [59, 130, 246],       // Modern blue #3b82f6
+        primaryDark: [37, 99, 235],    // Darker blue #2563eb
+        primaryLight: [147, 197, 253], // Light blue #93c5fd
+        secondary: [99, 102, 241],     // Indigo #6366f1
+        accent: [168, 85, 247],        // Purple accent #a855f7
+        success: [34, 197, 94],        // Green #22c55e
+        warning: [251, 191, 36],       // Amber #fbbf24
+        danger: [239, 68, 68],         // Red #ef4444
+        info: [56, 189, 248],          // Sky blue #38bdf8
+        neutral: [107, 114, 128],      // Gray #6b7280
+        neutralLight: [243, 244, 246], // Light gray #f3f4f6
+        neutralDark: [31, 41, 55],     // Dark gray #1f2937
         white: [255, 255, 255],
-        black: [44, 62, 80]            // #2c3e50
+        black: [15, 23, 42],           // Slate black #0f172a
+        gold: [245, 158, 11],          // Gold #f59e0b
+        emerald: [16, 185, 129],       // Emerald #10b981
+        rose: [244, 63, 94],           // Rose #f43f5e
+        gradient1: [139, 92, 246],     // Violet #8b5cf6
+        gradient2: [236, 72, 153],     // Pink #ec4899
       };
 
       // Set up page dimensions and margins
@@ -208,104 +217,227 @@ const handler = async (req: Request): Promise<Response> => {
       
       let yPosition = margin;
       
-      // Enhanced Header with gradient background effect
+      // Modern gradient header with geometric elements
       doc.setFillColor(...colors.primary);
-      doc.rect(0, 0, pageWidth, 45, 'F');
+      doc.rect(0, 0, pageWidth, 50, 'F');
       
-      // Add decorative elements
+      // Gradient overlay effect (simulated with multiple rectangles)
       doc.setFillColor(...colors.primaryDark);
-      doc.rect(0, 40, pageWidth, 5, 'F');
+      doc.rect(0, 40, pageWidth, 10, 'F');
       
-      // Header text
+      // Decorative accent elements
+      doc.setFillColor(...colors.accent);
+      doc.rect(0, 47, pageWidth, 3, 'F');
+      
+      // Add subtle geometric pattern
+      doc.setFillColor(...colors.primaryLight);
+      for (let i = 0; i < pageWidth; i += 20) {
+        doc.circle(i, 10, 2, 'F');
+      }
+      
+      // Premium header typography
       doc.setTextColor(...colors.white);
-      doc.setFontSize(24);
+      doc.setFontSize(28);
       doc.setFont(undefined, 'bold');
-      doc.text('DAILY SALES REPORT', pageWidth / 2, 20, { align: 'center' });
+      doc.text('📊 SALES PERFORMANCE REPORT', pageWidth / 2, 20, { align: 'center' });
       
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setFont(undefined, 'normal');
-      doc.text(reportData.merchantName, pageWidth / 2, 32, { align: 'center' });
+      doc.text(`${reportData.merchantName.toUpperCase()}`, pageWidth / 2, 32, { align: 'center' });
       
-      yPosition = 60;
-      
-      // Report metadata section
-      doc.setTextColor(...colors.gray);
+      // Add report type and date subtitle
       doc.setFontSize(10);
-      doc.text(`Report Period: ${reportData.periodDescription}`, margin, yPosition);
-      doc.text(`Generated: ${new Date(reportData.generatedAt).toLocaleString()}`, pageWidth - margin, yPosition, { align: 'right' });
+      doc.setTextColor(...colors.primaryLight);
+      doc.text(`${reportType.replace('_', ' ').toUpperCase()} • ${periodDescription}`, pageWidth / 2, 42, { align: 'center' });
+      
+      yPosition = 65;
+      
+      // Executive Summary Section
+      doc.setFillColor(...colors.neutralLight);
+      doc.roundedRect(margin, yPosition, contentWidth, 30, 3, 3, 'F');
+      
+      // Executive summary border accent
+      doc.setFillColor(...colors.secondary);
+      doc.rect(margin, yPosition, 4, 30, 'F');
+      
+      doc.setTextColor(...colors.neutralDark);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('📈 EXECUTIVE SUMMARY', margin + 10, yPosition + 12);
+      
+      // Key insights text
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(...colors.neutral);
+      const topPerformer = reportData.employees[0]?.employee_name || 'N/A';
+      const avgSales = reportData.employees.length > 0 ? (totalSales / reportData.employees.length).toFixed(0) : '0';
+      doc.text(`Top Performer: ${topPerformer} • Average Sales per Employee: $${avgSales} • Commission Rate: ${((totalCommission/totalSales)*100).toFixed(1)}%`, margin + 10, yPosition + 22);
+      
+      yPosition += 40;
+      
+      // Report metadata with enhanced styling
+      doc.setTextColor(...colors.neutral);
+      doc.setFontSize(9);
+      doc.text(`🗓️ Report Period: ${reportData.periodDescription}`, margin, yPosition);
+      doc.text(`⏰ Generated: ${new Date(reportData.generatedAt).toLocaleString()}`, pageWidth - margin, yPosition, { align: 'right' });
+      yPosition += 18;
+      
+      // Enhanced KPI Dashboard with visual indicators
+      doc.setTextColor(...colors.neutralDark);
+      doc.setFontSize(16);
+      doc.setFont(undefined, 'bold');
+      doc.text('💡 KEY PERFORMANCE INDICATORS', margin, yPosition);
       yPosition += 15;
       
-      // Summary section with colored cards
-      doc.setTextColor(...colors.black);
-      doc.setFontSize(16);
-      doc.setFont(undefined, 'bold');
-      doc.text('📊 PERFORMANCE SUMMARY', margin, yPosition);
-      yPosition += 12;
-      
-      // Create summary cards in a 2x2 grid
-      const cardWidth = (contentWidth - 10) / 2;
-      const cardHeight = 25;
+      // Create enhanced KPI cards with progress bars and icons
+      const cardWidth = (contentWidth - 15) / 2;
+      const cardHeight = 35;
       const cardSpacing = 5;
       
-      const summaryData = [
-        { label: 'Total Sales', value: `$${reportData.totalSales.toFixed(2)}`, color: colors.success, x: 0, y: 0 },
-        { label: 'Commission Paid', value: `$${reportData.totalCommission.toFixed(2)}`, color: colors.info, x: 1, y: 0 },
-        { label: 'Shop Commission', value: `$${reportData.shopCommission.toFixed(2)}`, color: colors.purple, x: 0, y: 1 },
-        { label: 'Active Employees', value: reportData.employees.length.toString(), color: colors.orange, x: 1, y: 1 }
+      // Calculate performance metrics
+      const commissionRate = totalSales > 0 ? (totalCommission / totalSales) * 100 : 0;
+      const avgSalesPerEmployee = reportData.employees.length > 0 ? totalSales / reportData.employees.length : 0;
+      
+      const kpiData = [
+        { 
+          label: 'Total Revenue', 
+          value: `$${reportData.totalSales.toLocaleString()}`, 
+          subtitle: `${reportData.employees.length} active employees`,
+          icon: '💰',
+          color: colors.success, 
+          bgColor: colors.neutralLight,
+          x: 0, y: 0 
+        },
+        { 
+          label: 'Commission Distribution', 
+          value: `${commissionRate.toFixed(1)}%`, 
+          subtitle: `$${reportData.totalCommission.toLocaleString()} paid out`,
+          icon: '📈',
+          color: colors.info, 
+          bgColor: colors.neutralLight,
+          x: 1, y: 0 
+        },
+        { 
+          label: 'Shop Retention', 
+          value: `$${reportData.shopCommission.toLocaleString()}`, 
+          subtitle: `${(100 - commissionRate).toFixed(1)}% retained`,
+          icon: '🏪',
+          color: colors.accent, 
+          bgColor: colors.neutralLight,
+          x: 0, y: 1 
+        },
+        { 
+          label: 'Average per Employee', 
+          value: `$${avgSalesPerEmployee.toLocaleString()}`, 
+          subtitle: `Performance metric`,
+          icon: '👥',
+          color: colors.warning, 
+          bgColor: colors.neutralLight,
+          x: 1, y: 1 
+        }
       ];
       
-      summaryData.forEach(card => {
-        const cardX = margin + (card.x * (cardWidth + cardSpacing));
-        const cardY = yPosition + (card.y * (cardHeight + cardSpacing));
+      kpiData.forEach(kpi => {
+        const cardX = margin + (kpi.x * (cardWidth + cardSpacing));
+        const cardY = yPosition + (kpi.y * (cardHeight + cardSpacing));
         
-        // Card background
-        doc.setFillColor(...colors.lightGray);
-        doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 2, 2, 'F');
+        // Modern card with shadow effect (simulated)
+        doc.setFillColor(220, 220, 220); // Shadow
+        doc.roundedRect(cardX + 1, cardY + 1, cardWidth, cardHeight, 4, 4, 'F');
         
-        // Colored accent bar
-        doc.setFillColor(...card.color);
-        doc.rect(cardX, cardY, cardWidth, 3, 'F');
+        // Main card background
+        doc.setFillColor(...kpi.bgColor);
+        doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 4, 4, 'F');
         
-        // Card content
-        doc.setTextColor(...colors.gray);
-        doc.setFontSize(9);
+        // Gradient accent bar (top)
+        doc.setFillColor(...kpi.color);
+        doc.roundedRect(cardX, cardY, cardWidth, 4, 4, 4, 'F');
+        
+        // Icon background circle
+        doc.setFillColor(...kpi.color);
+        doc.circle(cardX + 12, cardY + 15, 8, 'F');
+        
+        // Icon (simulated with text)
+        doc.setTextColor(...colors.white);
+        doc.setFontSize(12);
+        doc.text(kpi.icon, cardX + 8, cardY + 18);
+        
+        // KPI Label
+        doc.setTextColor(...colors.neutral);
+        doc.setFontSize(8);
         doc.setFont(undefined, 'normal');
-        doc.text(card.label.toUpperCase(), cardX + 5, cardY + 12);
+        doc.text(kpi.label.toUpperCase() + ':', cardX + 25, cardY + 12);
         
-        doc.setTextColor(...card.color);
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text(card.value, cardX + 5, cardY + 20);
-      });
-      
-      yPosition += 60;
-      
-      // Employee Performance Section
-      if (reportData.employees.length > 0) {
-        doc.setTextColor(...colors.black);
+        // KPI Value
+        doc.setTextColor(...kpi.color);
         doc.setFontSize(16);
         doc.setFont(undefined, 'bold');
-        doc.text('👥 EMPLOYEE PERFORMANCE', margin, yPosition);
+        doc.text(kpi.value, cardX + 25, cardY + 22);
+        
+        // Subtitle
+        doc.setTextColor(...colors.neutral);
+        doc.setFontSize(7);
+        doc.setFont(undefined, 'normal');
+        doc.text(kpi.subtitle, cardX + 25, cardY + 30);
+        
+        // Progress bar for percentage-based metrics
+        if (kpi.label.includes('Commission') || kpi.label.includes('Retention')) {
+          const progressWidth = 60;
+          const progressHeight = 3;
+          const progressX = cardX + cardWidth - progressWidth - 5;
+          const progressY = cardY + cardHeight - 8;
+          
+          // Progress background
+          doc.setFillColor(...colors.neutralLight);
+          doc.rect(progressX, progressY, progressWidth, progressHeight, 'F');
+          
+          // Progress fill
+          const fillWidth = (progressWidth * Math.min(commissionRate, 100)) / 100;
+          doc.setFillColor(...kpi.color);
+          doc.rect(progressX, progressY, fillWidth, progressHeight, 'F');
+        }
+      });
+      
+      yPosition += 75;
+      
+      // Employee Performance Analytics Section
+      if (reportData.employees.length > 0) {
+        // Performance Analytics Header
+        doc.setTextColor(...colors.neutralDark);
+        doc.setFontSize(16);
+        doc.setFont(undefined, 'bold');
+        doc.text('🏆 EMPLOYEE PERFORMANCE ANALYTICS', margin, yPosition);
+        yPosition += 8;
+        
+        // Performance summary bar
+        doc.setTextColor(...colors.neutral);
+        doc.setFontSize(9);
+        doc.text(`Ranking based on total sales • Top 3 performers highlighted • ${reportData.employees.length} total employees`, margin, yPosition);
         yPosition += 15;
         
-        // Enhanced table with professional styling
+        // Premium table with advanced styling and performance bars
         const tableStartY = yPosition;
-        const rowHeight = 12;
-        const colWidths = [50, 30, 35, 35, 30];
-        const headers = ['Employee Name', 'ID', 'Total Sales', 'Commission', 'Shop Com.'];
+        const rowHeight = 16;
+        const colWidths = [45, 25, 35, 35, 30, 25];
+        const headers = ['Employee', 'ID', 'Sales ($)', 'Commission', 'Shop Rev.', 'Rank'];
         
-        // Table header background
+        // Modern gradient header
         doc.setFillColor(...colors.primary);
-        doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+        doc.roundedRect(margin, yPosition - 3, contentWidth, rowHeight + 2, 2, 2, 'F');
         
-        // Header text
+        // Header accent
+        doc.setFillColor(...colors.primaryDark);
+        doc.rect(margin, yPosition + rowHeight - 2, contentWidth, 2, 'F');
+        
+        // Header text with icons
         doc.setTextColor(...colors.white);
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setFont(undefined, 'bold');
         
-        let xPosition = margin + 2;
+        let xPosition = margin + 3;
+        const headerIcons = ['👤', '🆔', '💵', '📊', '🏪', '🏅'];
         headers.forEach((header, index) => {
-          doc.text(header, xPosition, yPosition + 6);
+          doc.text(`${headerIcons[index]} ${header}`, xPosition, yPosition + 7);
           xPosition += colWidths[index];
         });
         
@@ -315,103 +447,214 @@ const handler = async (req: Request): Promise<Response> => {
         doc.setTextColor(...colors.black);
         doc.setFont(undefined, 'normal');
         
+        // Calculate max sales for performance bars
+        const maxSales = Math.max(...reportData.employees.map((emp: any) => emp.total_sales));
+        
         reportData.employees.forEach((employee: any, index: number) => {
           // Check if we need a new page
-          if (yPosition > pageHeight - 40) {
+          if (yPosition > pageHeight - 50) {
             doc.addPage();
             yPosition = margin;
             
-            // Repeat header on new page
+            // Repeat modern header on new page
             doc.setFillColor(...colors.primary);
-            doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+            doc.roundedRect(margin, yPosition - 3, contentWidth, rowHeight + 2, 2, 2, 'F');
+            doc.setFillColor(...colors.primaryDark);
+            doc.rect(margin, yPosition + rowHeight - 2, contentWidth, 2, 'F');
+            
             doc.setTextColor(...colors.white);
-            doc.setFontSize(10);
+            doc.setFontSize(9);
             doc.setFont(undefined, 'bold');
             
-            xPosition = margin + 2;
+            xPosition = margin + 3;
             headers.forEach((header, i) => {
-              doc.text(header, xPosition, yPosition + 6);
+              doc.text(`${headerIcons[i]} ${header}`, xPosition, yPosition + 7);
               xPosition += colWidths[i];
             });
             
             yPosition += rowHeight;
-            doc.setTextColor(...colors.black);
+            doc.setTextColor(...colors.neutralDark);
             doc.setFont(undefined, 'normal');
           }
           
-          // Alternating row colors
-          if (index % 2 === 0) {
-            doc.setFillColor(...colors.lightGray);
-            doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+          // Enhanced row styling with performance-based colors
+          const performanceScore = (employee.total_sales / maxSales) * 100;
+          let rowBgColor = colors.neutralLight;
+          let accentColor = colors.neutral;
+          
+          if (index === 0) {
+            rowBgColor = [255, 248, 220]; // Gold tint for #1
+            accentColor = colors.gold;
+          } else if (index === 1) {
+            rowBgColor = [245, 245, 245]; // Silver tint for #2
+            accentColor = colors.neutral;
+          } else if (index === 2) {
+            rowBgColor = [255, 237, 213]; // Bronze tint for #3
+            accentColor = colors.warning;
+          } else if (index % 2 === 0) {
+            rowBgColor = colors.neutralLight;
           }
           
-          // Top performer highlighting
-          const isTopPerformer = index < 3 && reportData.employees.length > 3;
-          if (isTopPerformer) {
-            doc.setFillColor(212, 237, 218); // Light green
-            doc.rect(margin, yPosition - 2, contentWidth, rowHeight, 'F');
+          // Row background with subtle styling
+          doc.setFillColor(...rowBgColor);
+          doc.roundedRect(margin, yPosition - 2, contentWidth, rowHeight, 1, 1, 'F');
+          
+          // Performance bar on the left edge
+          const barWidth = 2;
+          const barHeight = (performanceScore / 100) * (rowHeight - 4);
+          doc.setFillColor(...accentColor);
+          doc.rect(margin, yPosition + rowHeight - barHeight - 2, barWidth, barHeight, 'F');
+          
+          // Top performer medals
+          if (index < 3 && reportData.employees.length > 3) {
+            const medals = ['🥇', '🥈', '🥉'];
+            doc.setFontSize(12);
+            doc.text(medals[index], margin + contentWidth - 10, yPosition + 8);
           }
           
-          // Row data
-          xPosition = margin + 2;
-          doc.setFontSize(9);
+          // Enhanced row data with better typography and visual elements
+          xPosition = margin + 5; // Offset for performance bar
+          doc.setFontSize(8);
           
-          // Employee name with performance indicator
+          // Employee name with smart truncation
           let nameText = employee.employee_name || employee.employee_id;
-          if (nameText.length > 20) nameText = nameText.substring(0, 17) + '...';
+          if (nameText.length > 15) nameText = nameText.substring(0, 12) + '...';
           
-          if (isTopPerformer) {
-            doc.setTextColor(...colors.success);
-            doc.setFont(undefined, 'bold');
-            doc.text('★ ' + nameText, xPosition, yPosition + 6);
-            doc.setFont(undefined, 'normal');
-            doc.setTextColor(...colors.black);
-          } else {
-            doc.text(nameText, xPosition, yPosition + 6);
-          }
+          doc.setTextColor(...colors.neutralDark);
+          doc.setFont(undefined, index < 3 ? 'bold' : 'normal');
+          doc.text(nameText, xPosition, yPosition + 8);
+          
+          // Add performance indicator dot
+          const performanceLevel = performanceScore > 75 ? 'high' : performanceScore > 50 ? 'medium' : 'low';
+          const dotColor = performanceLevel === 'high' ? colors.success : 
+                          performanceLevel === 'medium' ? colors.warning : colors.danger;
+          doc.setFillColor(...dotColor);
+          doc.circle(xPosition + 35, yPosition + 6, 1.5, 'F');
+          
           xPosition += colWidths[0];
           
-          // Employee ID
-          doc.setTextColor(...colors.gray);
+          // Employee ID with better formatting
+          doc.setTextColor(...colors.neutral);
+          doc.setFont(undefined, 'normal');
           let idText = employee.employee_id.toString();
-          if (idText.length > 12) idText = idText.substring(0, 9) + '...';
-          doc.text(idText, xPosition, yPosition + 6);
+          if (idText.length > 8) idText = idText.substring(0, 6) + '..';
+          doc.text(idText, xPosition, yPosition + 8);
           xPosition += colWidths[1];
           
-          // Sales amount
+          // Sales amount with performance bar
           doc.setTextColor(...colors.success);
           doc.setFont(undefined, 'bold');
-          doc.text(`$${employee.total_sales.toFixed(0)}`, xPosition, yPosition + 6);
-          doc.setFont(undefined, 'normal');
+          doc.text(`$${employee.total_sales.toLocaleString()}`, xPosition, yPosition + 8);
+          
+          // Mini performance bar under sales
+          const miniBarWidth = 25;
+          const miniBarHeight = 2;
+          const miniBarX = xPosition;
+          const miniBarY = yPosition + 11;
+          
+          doc.setFillColor(...colors.neutralLight);
+          doc.rect(miniBarX, miniBarY, miniBarWidth, miniBarHeight, 'F');
+          
+          const fillWidth = (miniBarWidth * performanceScore) / 100;
+          doc.setFillColor(...colors.success);
+          doc.rect(miniBarX, miniBarY, fillWidth, miniBarHeight, 'F');
+          
           xPosition += colWidths[2];
           
-          // Commission amount
+          // Commission amount with percentage
           doc.setTextColor(...colors.info);
-          doc.text(`$${employee.commission_amount.toFixed(0)}`, xPosition, yPosition + 6);
+          doc.setFont(undefined, 'bold');
+          doc.text(`$${employee.commission_amount.toLocaleString()}`, xPosition, yPosition + 8);
+          
+          // Commission rate
+          const commRate = employee.total_sales > 0 ? (employee.commission_amount / employee.total_sales * 100) : 0;
+          doc.setTextColor(...colors.neutral);
+          doc.setFontSize(7);
+          doc.setFont(undefined, 'normal');
+          doc.text(`(${commRate.toFixed(1)}%)`, xPosition, yPosition + 12);
+          
           xPosition += colWidths[3];
           
-          // Shop commission
-          doc.setTextColor(...colors.purple);
+          // Shop commission with visual emphasis
+          doc.setTextColor(...colors.accent);
+          doc.setFont(undefined, 'bold');
+          doc.setFontSize(8);
           const shopCom = employee.total_sales - employee.commission_amount;
-          doc.text(`$${shopCom.toFixed(0)}`, xPosition, yPosition + 6);
+          doc.text(`$${shopCom.toLocaleString()}`, xPosition, yPosition + 8);
+          xPosition += colWidths[4];
+          
+          // Ranking with styled badges
+          doc.setTextColor(...accentColor);
+          doc.setFont(undefined, 'bold');
+          doc.setFontSize(10);
+          doc.text(`#${index + 1}`, xPosition, yPosition + 8);
           
           yPosition += rowHeight;
         });
         
-        // Table border
-        doc.setDrawColor(...colors.gray);
-        doc.rect(margin, tableStartY - 2, contentWidth, yPosition - tableStartY + 2);
+        // Modern table border with shadow effect
+        doc.setDrawColor(...colors.neutral);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(margin, tableStartY - 3, contentWidth, yPosition - tableStartY + 5, 2, 2);
+        
+        // Add performance insights section
+        yPosition += 10;
+        
+        // Performance Insights Box
+        doc.setFillColor(...colors.neutralLight);
+        doc.roundedRect(margin, yPosition, contentWidth, 25, 3, 3, 'F');
+        
+        doc.setFillColor(...colors.info);
+        doc.rect(margin, yPosition, 4, 25, 'F');
+        
+        doc.setTextColor(...colors.neutralDark);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text('💡 PERFORMANCE INSIGHTS', margin + 10, yPosition + 8);
+        
+        // Generate insights
+        const topPerformerSales = reportData.employees[0]?.total_sales || 0;
+        const bottomPerformerSales = reportData.employees[reportData.employees.length - 1]?.total_sales || 0;
+        const performanceGap = topPerformerSales - bottomPerformerSales;
+        
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(...colors.neutral);
+        doc.text(`Performance Gap: $${performanceGap.toLocaleString()} between top and bottom performer`, margin + 10, yPosition + 16);
+        doc.text(`Team Efficiency: ${reportData.employees.length > 0 ? ((totalCommission/totalSales)*100).toFixed(1) : '0'}% commission rate indicates ${commissionRate > 15 ? 'high' : commissionRate > 10 ? 'moderate' : 'conservative'} incentive structure`, margin + 10, yPosition + 21);
+        
+        yPosition += 30;
       }
       
-      // Footer section
-      const footerY = pageHeight - 25;
-      doc.setFillColor(...colors.lightGray);
-      doc.rect(0, footerY, pageWidth, 25, 'F');
+      // Premium footer with branding
+      const footerY = pageHeight - 30;
       
-      doc.setTextColor(...colors.gray);
-      doc.setFontSize(8);
-      doc.text('This report was automatically generated by your Sales Management System', pageWidth / 2, footerY + 8, { align: 'center' });
-      doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth / 2, footerY + 15, { align: 'center' });
+      // Footer gradient background
+      doc.setFillColor(...colors.primary);
+      doc.rect(0, footerY, pageWidth, 30, 'F');
+      
+      doc.setFillColor(...colors.primaryDark);
+      doc.rect(0, footerY, pageWidth, 3, 'F');
+      
+      // Company branding section
+      doc.setTextColor(...colors.white);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.text('🚀 POWERED BY SALES MANAGEMENT PRO', pageWidth / 2, footerY + 12, { align: 'center' });
+      
+      // Footer details
+      doc.setFontSize(7);
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(...colors.primaryLight);
+      doc.text(`Confidential Report • Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, pageWidth / 2, footerY + 20, { align: 'center' });
+      
+      // Add QR code placeholder (simulated)
+      doc.setFillColor(...colors.white);
+      doc.roundedRect(pageWidth - 35, footerY + 5, 20, 20, 2, 2, 'F');
+      doc.setTextColor(...colors.primary);
+      doc.setFontSize(6);
+      doc.text('QR CODE', pageWidth - 28, footerY + 12, { align: 'center' });
+      doc.text('DASHBOARD', pageWidth - 28, footerY + 18, { align: 'center' });
       
       // Add page numbers if multiple pages
       const pageCount = doc.internal.getNumberOfPages();
