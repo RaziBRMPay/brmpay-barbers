@@ -316,46 +316,52 @@ const createModernPDF = async (reportData: any): Promise<Uint8Array> => {
       
       yPos -= rowHeight;
       
-      // Table rows (limit to first 15 employees to fit on page)
-      const employeesToShow = reportData.employees.slice(0, 15);
-      employeesToShow.forEach((employee: any, index: number) => {
-        const isTopPerformer = index < 3;
-        const rowColor = isTopPerformer ? neutralLightColor : whiteColor;
-        
-        page.drawRectangle({
-          x: tableX,
-          y: yPos - rowHeight,
-          width: colWidths.reduce((a, b) => a + b, 0),
-          height: rowHeight,
-          color: rowColor,
-          borderColor: neutralLightColor,
-          borderWidth: 0.5,
-        });
-        
-        xPos = tableX;
-        const rowData = [
-          (employee.employee_name || 'N/A').substring(0, 12), // Truncate long names
-          (employee.employee_id || 'N/A').substring(0, 8),
-          `$${(employee.total_sales || 0).toLocaleString()}`,
-          `$${(employee.commission_amount || 0).toLocaleString()}`,
-          `$${((employee.total_sales || 0) - (employee.commission_amount || 0)).toLocaleString()}`,
-          `#${index + 1}`
-        ];
-        
-        rowData.forEach((data, i) => {
-          const textColor = isTopPerformer && i === 5 ? warningColor : rgb(0.12, 0.16, 0.22);
-          page.drawText(data, {
-            x: xPos + 5,
-            y: yPos - 15,
-            size: 8,
-            font: isTopPerformer ? boldFont : regularFont,
-            color: textColor,
+        // Table rows (limit to first 15 employees to fit on page, filter out zero sales for cleaner display)
+        const employeesToShow = reportData.employees
+          .filter((emp: any) => (emp.total_sales || 0) > 0) // Only show employees with sales
+          .slice(0, 15);
+          
+        employeesToShow.forEach((employee: any, index: number) => {
+          const isTopPerformer = index < 3;
+          const rowColor = isTopPerformer ? neutralLightColor : whiteColor;
+          
+          // Calculate shop revenue (what the shop keeps)
+          const shopRevenue = (employee.total_sales || 0) - (employee.commission_amount || 0);
+          
+          page.drawRectangle({
+            x: tableX,
+            y: yPos - rowHeight,
+            width: colWidths.reduce((a, b) => a + b, 0),
+            height: rowHeight,
+            color: rowColor,
+            borderColor: neutralLightColor,
+            borderWidth: 0.5,
           });
-          xPos += colWidths[i];
+          
+          xPos = tableX;
+          const rowData = [
+            (employee.employee_name || 'N/A').substring(0, 12), // Employee name
+            (employee.employee_id || 'N/A').substring(0, 8),    // Employee ID
+            `$${Math.round(employee.total_sales || 0).toLocaleString()}`,     // Total Sales
+            `$${Math.round(employee.commission_amount || 0).toLocaleString()}`, // Employee Commission
+            `$${Math.round(shopRevenue).toLocaleString()}`,      // Shop Revenue (what shop keeps)
+            `#${index + 1}`  // Rank
+          ];
+          
+          rowData.forEach((data, i) => {
+            const textColor = isTopPerformer && i === 5 ? warningColor : rgb(0.12, 0.16, 0.22);
+            page.drawText(data, {
+              x: xPos + 5,
+              y: yPos - 15,
+              size: 8,
+              font: isTopPerformer ? boldFont : regularFont,
+              color: textColor,
+            });
+            xPos += colWidths[i];
+          });
+          
+          yPos -= rowHeight;
         });
-        
-        yPos -= rowHeight;
-      });
     }
     
     // Footer
@@ -532,6 +538,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Report totals - Sales: $${totalSales}, Commission: $${totalCommission}, Shop: $${shopCommission}`);
 
+    // Sort employees by total_sales in descending order and add debugging
+    const sortedEmployees = (salesData || []).sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0));
+    
+    console.log('Employee data for PDF:');
+    sortedEmployees.slice(0, 5).forEach((emp, idx) => {
+      console.log(`${idx + 1}. ${emp.employee_name}: Sales=$${emp.total_sales}, Commission=$${emp.commission_amount}, Shop=$${(emp.total_sales || 0) - (emp.commission_amount || 0)}`);
+    });
+
     const reportData = {
       merchantName: merchantData?.shop_name || 'Unknown Shop',
       reportDate: actualReportDate,
@@ -540,7 +554,7 @@ const handler = async (req: Request): Promise<Response> => {
       totalSales,
       totalCommission,
       shopCommission,
-      employees: salesData || [],
+      employees: sortedEmployees,
       generatedAt: new Date().toISOString(),
       startDateTime,
       endDateTime
