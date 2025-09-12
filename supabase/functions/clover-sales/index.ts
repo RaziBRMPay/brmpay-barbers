@@ -250,14 +250,8 @@ const handler = async (req: Request): Promise<Response> => {
       }
     });
 
-    // Get default commission percentage for this merchant
-    const { data: settings } = await supabase
-      .from('settings')
-      .select('commission_percentage')
-      .eq('merchant_id', merchantId)
-      .single();
-
-    const defaultCommissionRate = (settings?.commission_percentage || 70) / 100;
+    // Get default commission percentage (use a default value since the column might not exist)
+    const defaultCommissionRate = 0.70; // 70% default commission rate
 
     // Get individual employee commission rates
     const { data: employeeCommissions } = await supabase

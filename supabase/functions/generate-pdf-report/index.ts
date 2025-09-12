@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.55.0";
-import PDFDocument from "https://esm.sh/pdfkit@0.17.1";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0";
 import { format } from "https://esm.sh/date-fns@3.6.0";
 
@@ -51,257 +51,363 @@ const colors = {
   rose: '#f43f5e',
 };
 
-const createModernPDF = (reportData: any): Promise<Uint8Array> => {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ 
-        size: 'A4', 
-        margin: 50,
-        info: {
-          Title: `Sales Report - ${reportData.merchantName}`,
-          Author: 'Sales Commission System',
-          Subject: 'Daily Sales Performance Report',
-          Creator: 'PDFKit'
-        }
-      });
-
-      const chunks: Uint8Array[] = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => {
-        const pdfBuffer = new Uint8Array(chunks.reduce((acc, chunk) => acc + chunk.length, 0));
-        let offset = 0;
-        for (const chunk of chunks) {
-          pdfBuffer.set(chunk, offset);
-          offset += chunk.length;
-        }
-        resolve(pdfBuffer);
-      });
-      doc.on('error', reject);
-
-      // Page dimensions
-      const pageWidth = doc.page.width;
-      const pageHeight = doc.page.height;
-      const margin = 50;
+const createModernPDF = async (reportData: any): Promise<Uint8Array> => {
+  try {
+    // Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    
+    // Embed fonts
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    
+    // Add a page
+    const page = pdfDoc.addPage([595, 842]); // A4 size
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+    const margin = 50;
+    
+    // Colors (convert hex to RGB)
+    const primaryColor = rgb(0.23, 0.51, 0.96); // #3b82f6
+    const primaryDarkColor = rgb(0.15, 0.39, 0.92); // #2563eb
+    const neutralColor = rgb(0.42, 0.45, 0.50); // #6b7280
+    const neutralLightColor = rgb(0.95, 0.96, 0.96); // #f3f4f6
+    const whiteColor = rgb(1, 1, 1);
+    const successColor = rgb(0.13, 0.77, 0.37); // #22c55e
+    const infoColor = rgb(0.22, 0.74, 0.97); // #38bdf8
+    const accentColor = rgb(0.66, 0.33, 0.97); // #a855f7
+    const warningColor = rgb(0.96, 0.62, 0.07); // #f59e0b
+    
+    // Header background
+    page.drawRectangle({
+      x: 0,
+      y: pageHeight - 120,
+      width: pageWidth,
+      height: 120,
+      color: primaryColor,
+    });
+    
+    // Header accent bar
+    page.drawRectangle({
+      x: 0,
+      y: pageHeight - 120,
+      width: pageWidth,
+      height: 20,
+      color: primaryDarkColor,
+    });
+    
+    // Company logo placeholder (circle)
+    page.drawCircle({
+      x: margin + 30,
+      y: pageHeight - 70,
+      size: 25,
+      color: whiteColor,
+    });
+    
+    // Header text
+    page.drawText('SALES PERFORMANCE REPORT', {
+      x: margin + 80,
+      y: pageHeight - 50,
+      size: 24,
+      font: boldFont,
+      color: whiteColor,
+    });
+    
+    page.drawText(reportData.merchantName.toUpperCase(), {
+      x: margin + 80,
+      y: pageHeight - 75,
+      size: 14,
+      font: regularFont,
+      color: whiteColor,
+    });
+    
+    page.drawText(`${reportData.reportType.replace('_', ' ').toUpperCase()} • ${reportData.periodDescription}`, {
+      x: margin + 80,
+      y: pageHeight - 95,
+      size: 10,
+      font: regularFont,
+      color: whiteColor,
+    });
+    
+    // Executive Summary Section
+    let yPos = pageHeight - 180;
+    
+    page.drawRectangle({
+      x: margin,
+      y: yPos - 80,
+      width: pageWidth - 2 * margin,
+      height: 80,
+      color: neutralLightColor,
+    });
+    
+    page.drawText('EXECUTIVE SUMMARY', {
+      x: margin + 20,
+      y: yPos - 25,
+      size: 14,
+      font: boldFont,
+      color: rgb(0.12, 0.16, 0.22),
+    });
+    
+    const topPerformer = reportData.employees[0]?.employee_name || 'N/A';
+    const avgSales = reportData.employees.length > 0 ? (reportData.totalSales / reportData.employees.length).toFixed(0) : '0';
+    const commissionRate = reportData.totalSales > 0 ? ((reportData.totalCommission / reportData.totalSales) * 100).toFixed(1) : '0';
+    
+    page.drawText(`Top Performer: ${topPerformer}`, {
+      x: margin + 20,
+      y: yPos - 45,
+      size: 10,
+      font: regularFont,
+      color: neutralColor,
+    });
+    
+    page.drawText(`Average Sales per Employee: $${avgSales}`, {
+      x: margin + 20,
+      y: yPos - 58,
+      size: 10,
+      font: regularFont,
+      color: neutralColor,
+    });
+    
+    page.drawText(`Commission Rate: ${commissionRate}%`, {
+      x: margin + 20,
+      y: yPos - 71,
+      size: 10,
+      font: regularFont,
+      color: neutralColor,
+    });
+    
+    yPos -= 120;
+    
+    // Key Performance Indicators
+    page.drawText('KEY PERFORMANCE INDICATORS', {
+      x: margin,
+      y: yPos,
+      size: 14,
+      font: boldFont,
+      color: rgb(0.12, 0.16, 0.22),
+    });
+    
+    yPos -= 40;
+    
+    // KPI Cards
+    const cardWidth = (pageWidth - 2 * margin - 20) / 2;
+    const cardHeight = 70;
+    
+    const kpiData = [
+      {
+        label: 'Total Revenue',
+        value: `$${reportData.totalSales.toLocaleString()}`,
+        subtitle: `${reportData.employees.length} employees`,
+        color: successColor,
+        x: 0, y: 0
+      },
+      {
+        label: 'Total Commission',
+        value: `$${reportData.totalCommission.toLocaleString()}`,
+        subtitle: `${commissionRate}% commission rate`,
+        color: infoColor,
+        x: 1, y: 0
+      },
+      {
+        label: 'Shop Revenue',
+        value: `$${reportData.shopCommission.toLocaleString()}`,
+        subtitle: `${(100 - parseFloat(commissionRate)).toFixed(1)}% retained`,
+        color: accentColor,
+        x: 0, y: 1
+      },
+      {
+        label: 'Avg per Employee',
+        value: `$${avgSales}`,
+        subtitle: 'Performance metric',
+        color: warningColor,
+        x: 1, y: 1
+      }
+    ];
+    
+    kpiData.forEach(kpi => {
+      const cardX = margin + (kpi.x * (cardWidth + 20));
+      const cardY = yPos - (kpi.y * (cardHeight + 15));
       
-      // Professional header with gradient background
-      doc.rect(0, 0, pageWidth, 120)
-         .fill(colors.primary);
-
-      doc.rect(0, 100, pageWidth, 20)
-         .fill(colors.primaryDark);
-
-      // Company logo placeholder (circle)
-      doc.circle(margin + 30, 50, 25)
-         .fill(colors.white);
-
+      // Card background
+      page.drawRectangle({
+        x: cardX,
+        y: cardY - cardHeight,
+        width: cardWidth,
+        height: cardHeight,
+        color: whiteColor,
+        borderColor: neutralLightColor,
+        borderWidth: 1,
+      });
+      
+      // Accent bar
+      page.drawRectangle({
+        x: cardX,
+        y: cardY - 4,
+        width: cardWidth,
+        height: 4,
+        color: kpi.color,
+      });
+      
+      // Text content
+      page.drawText(kpi.label.toUpperCase(), {
+        x: cardX + 10,
+        y: cardY - 20,
+        size: 9,
+        font: regularFont,
+        color: neutralColor,
+      });
+      
+      page.drawText(kpi.value, {
+        x: cardX + 10,
+        y: cardY - 35,
+        size: 16,
+        font: boldFont,
+        color: kpi.color,
+      });
+      
+      page.drawText(kpi.subtitle, {
+        x: cardX + 10,
+        y: cardY - 50,
+        size: 8,
+        font: regularFont,
+        color: neutralColor,
+      });
+    });
+    
+    yPos -= 180;
+    
+    // Employee Performance Table
+    if (reportData.employees.length > 0) {
+      page.drawText('EMPLOYEE PERFORMANCE', {
+        x: margin,
+        y: yPos,
+        size: 14,
+        font: boldFont,
+        color: rgb(0.12, 0.16, 0.22),
+      });
+      
+      yPos -= 30;
+      
+      // Table header
+      const tableX = margin;
+      const rowHeight = 20;
+      const colWidths = [100, 50, 70, 80, 80, 40];
+      const headers = ['Employee', 'ID', 'Sales ($)', 'Commission ($)', 'Shop Rev. ($)', 'Rank'];
+      
+      // Header background
+      page.drawRectangle({
+        x: tableX,
+        y: yPos - rowHeight,
+        width: colWidths.reduce((a, b) => a + b, 0),
+        height: rowHeight,
+        color: primaryDarkColor,
+      });
+      
       // Header text
-      doc.fill(colors.white)
-         .fontSize(28)
-         .font('Helvetica-Bold')
-         .text('SALES PERFORMANCE REPORT', margin + 80, 30);
-
-      doc.fontSize(16)
-         .font('Helvetica')
-         .text(reportData.merchantName.toUpperCase(), margin + 80, 60);
-
-      doc.fontSize(12)
-         .text(`${reportData.reportType.replace('_', ' ').toUpperCase()} • ${reportData.periodDescription}`, margin + 80, 85);
-
-      // Executive Summary Section
-      let yPos = 150;
-      
-      doc.rect(margin, yPos, pageWidth - 2 * margin, 80)
-         .fill(colors.neutralLight);
-
-      doc.rect(margin, yPos, 5, 80)
-         .fill(colors.secondary);
-
-      doc.fill(colors.neutralDark)
-         .fontSize(16)
-         .font('Helvetica-Bold')
-         .text('📈 EXECUTIVE SUMMARY', margin + 20, yPos + 15);
-
-      const topPerformer = reportData.employees[0]?.employee_name || 'N/A';
-      const avgSales = reportData.employees.length > 0 ? (reportData.totalSales / reportData.employees.length).toFixed(0) : '0';
-      const commissionRate = reportData.totalSales > 0 ? ((reportData.totalCommission / reportData.totalSales) * 100).toFixed(1) : '0';
-
-      doc.fill(colors.neutral)
-         .fontSize(11)
-         .font('Helvetica')
-         .text(`Top Performer: ${topPerformer}`, margin + 20, yPos + 40)
-         .text(`Average Sales per Employee: $${avgSales}`, margin + 20, yPos + 55)
-         .text(`Commission Rate: ${commissionRate}%`, margin + 20, yPos + 70);
-
-      yPos += 100;
-
-      // Key Performance Indicators
-      doc.fill(colors.neutralDark)
-         .fontSize(16)
-         .font('Helvetica-Bold')
-         .text('💡 KEY PERFORMANCE INDICATORS', margin, yPos);
-
-      yPos += 30;
-
-      // KPI Cards Layout
-      const cardWidth = (pageWidth - 2 * margin - 20) / 2;
-      const cardHeight = 70;
-
-      const kpiData = [
-        {
-          label: 'Total Revenue',
-          value: `$${reportData.totalSales.toLocaleString()}`,
-          subtitle: `${reportData.employees.length} employees`,
-          color: colors.success,
-          x: 0, y: 0
-        },
-        {
-          label: 'Total Commission',
-          value: `$${reportData.totalCommission.toLocaleString()}`,
-          subtitle: `${commissionRate}% commission rate`,
-          color: colors.info,
-          x: 1, y: 0
-        },
-        {
-          label: 'Shop Revenue',
-          value: `$${reportData.shopCommission.toLocaleString()}`,
-          subtitle: `${(100 - parseFloat(commissionRate)).toFixed(1)}% retained`,
-          color: colors.accent,
-          x: 0, y: 1
-        },
-        {
-          label: 'Avg per Employee',
-          value: `$${avgSales}`,
-          subtitle: 'Performance metric',
-          color: colors.warning,
-          x: 1, y: 1
-        }
-      ];
-
-      kpiData.forEach(kpi => {
-        const cardX = margin + (kpi.x * (cardWidth + 20));
-        const cardY = yPos + (kpi.y * (cardHeight + 15));
-
-        // Card background
-        doc.rect(cardX, cardY, cardWidth, cardHeight)
-           .fill(colors.white)
-           .stroke(colors.neutralLight);
-
-        // Accent bar
-        doc.rect(cardX, cardY, cardWidth, 4)
-           .fill(kpi.color);
-
-        // Icon circle
-        doc.circle(cardX + 25, cardY + 25, 12)
-           .fill(kpi.color);
-
-        // Text content
-        doc.fill(colors.neutral)
-           .fontSize(10)
-           .font('Helvetica')
-           .text(kpi.label.toUpperCase(), cardX + 45, cardY + 15);
-
-        doc.fill(kpi.color)
-           .fontSize(18)
-           .font('Helvetica-Bold')
-           .text(kpi.value, cardX + 45, cardY + 30);
-
-        doc.fill(colors.neutral)
-           .fontSize(9)
-           .font('Helvetica')
-           .text(kpi.subtitle, cardX + 45, cardY + 50);
+      let xPos = tableX;
+      headers.forEach((header, i) => {
+        page.drawText(header, {
+          x: xPos + 5,
+          y: yPos - 15,
+          size: 9,
+          font: boldFont,
+          color: whiteColor,
+        });
+        xPos += colWidths[i];
       });
-
-      yPos += 160;
-
-      // Employee Performance Table
-      if (reportData.employees.length > 0) {
-        doc.fill(colors.neutralDark)
-           .fontSize(16)
-           .font('Helvetica-Bold')
-           .text('🏆 EMPLOYEE PERFORMANCE', margin, yPos);
-
-        yPos += 25;
-
-        // Table header
-        const tableX = margin;
-        const rowHeight = 25;
-        const colWidths = [120, 60, 80, 80, 80, 40];
-        const headers = ['Employee', 'ID', 'Sales ($)', 'Commission ($)', 'Shop Rev. ($)', 'Rank'];
-
-        // Header background
-        doc.rect(tableX, yPos, colWidths.reduce((a, b) => a + b, 0), rowHeight)
-           .fill(colors.primaryDark);
-
-        // Header text
-        let xPos = tableX;
-        headers.forEach((header, i) => {
-          doc.fill(colors.white)
-             .fontSize(11)
-             .font('Helvetica-Bold')
-             .text(header, xPos + 5, yPos + 8);
+      
+      yPos -= rowHeight;
+      
+      // Table rows (limit to first 15 employees to fit on page)
+      const employeesToShow = reportData.employees.slice(0, 15);
+      employeesToShow.forEach((employee: any, index: number) => {
+        const isTopPerformer = index < 3;
+        const rowColor = isTopPerformer ? neutralLightColor : whiteColor;
+        
+        page.drawRectangle({
+          x: tableX,
+          y: yPos - rowHeight,
+          width: colWidths.reduce((a, b) => a + b, 0),
+          height: rowHeight,
+          color: rowColor,
+          borderColor: neutralLightColor,
+          borderWidth: 0.5,
+        });
+        
+        xPos = tableX;
+        const rowData = [
+          (employee.employee_name || 'N/A').substring(0, 12), // Truncate long names
+          (employee.employee_id || 'N/A').substring(0, 8),
+          `$${(employee.total_sales || 0).toLocaleString()}`,
+          `$${(employee.commission_amount || 0).toLocaleString()}`,
+          `$${((employee.total_sales || 0) - (employee.commission_amount || 0)).toLocaleString()}`,
+          `#${index + 1}`
+        ];
+        
+        rowData.forEach((data, i) => {
+          const textColor = isTopPerformer && i === 5 ? warningColor : rgb(0.12, 0.16, 0.22);
+          page.drawText(data, {
+            x: xPos + 5,
+            y: yPos - 15,
+            size: 8,
+            font: isTopPerformer ? boldFont : regularFont,
+            color: textColor,
+          });
           xPos += colWidths[i];
         });
-
-        yPos += rowHeight;
-
-        // Table rows
-        reportData.employees.forEach((employee: any, index: number) => {
-          const isTopPerformer = index < 3;
-          const rowColor = isTopPerformer ? colors.neutralLight : colors.white;
-          
-          doc.rect(tableX, yPos, colWidths.reduce((a, b) => a + b, 0), rowHeight)
-             .fill(rowColor)
-             .stroke(colors.neutralLight);
-
-          xPos = tableX;
-          const rowData = [
-            employee.employee_name || 'N/A',
-            employee.employee_id || 'N/A',
-            `$${(employee.total_sales || 0).toLocaleString()}`,
-            `$${(employee.commission_amount || 0).toLocaleString()}`,
-            `$${((employee.total_sales || 0) - (employee.commission_amount || 0)).toLocaleString()}`,
-            `#${index + 1}`
-          ];
-
-          rowData.forEach((data, i) => {
-            const textColor = isTopPerformer && i === 5 ? colors.gold : colors.neutralDark;
-            doc.fill(textColor)
-               .fontSize(10)
-               .font(isTopPerformer ? 'Helvetica-Bold' : 'Helvetica')
-               .text(data, xPos + 5, yPos + 8);
-            xPos += colWidths[i];
-          });
-
-          yPos += rowHeight;
-
-          // Add new page if needed
-          if (yPos > pageHeight - 100) {
-            doc.addPage();
-            yPos = margin;
-          }
-        });
-      }
-
-      // Footer
-      const footerY = pageHeight - 50;
-      doc.rect(0, footerY, pageWidth, 50)
-         .fill(colors.neutralLight);
-
-      doc.fill(colors.neutral)
-         .fontSize(9)
-         .font('Helvetica')
-         .text(`Generated on ${new Date(reportData.generatedAt).toLocaleString()}`, margin, footerY + 15)
-         .text('Sales Commission Management System', margin, footerY + 30);
-
-      doc.fill(colors.primary)
-         .text('Confidential Report', pageWidth - margin - 100, footerY + 15)
-         .text(`Page 1 of 1`, pageWidth - margin - 100, footerY + 30);
-
-      doc.end();
-    } catch (error) {
-      reject(error);
+        
+        yPos -= rowHeight;
+      });
     }
-  });
+    
+    // Footer
+    const footerY = 50;
+    page.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: footerY,
+      color: neutralLightColor,
+    });
+    
+    page.drawText(`Generated on ${new Date(reportData.generatedAt).toLocaleString()}`, {
+      x: margin,
+      y: 30,
+      size: 8,
+      font: regularFont,
+      color: neutralColor,
+    });
+    
+    page.drawText('Sales Commission Management System', {
+      x: margin,
+      y: 15,
+      size: 8,
+      font: regularFont,
+      color: neutralColor,
+    });
+    
+    page.drawText('Confidential Report', {
+      x: pageWidth - margin - 100,
+      y: 30,
+      size: 8,
+      font: regularFont,
+      color: primaryColor,
+    });
+    
+    page.drawText('Page 1 of 1', {
+      x: pageWidth - margin - 60,
+      y: 15,
+      size: 8,
+      font: regularFont,
+      color: primaryColor,
+    });
+    
+    // Serialize the PDF document to bytes
+    const pdfBytes = await pdfDoc.save();
+    return new Uint8Array(pdfBytes);
+    
+  } catch (error) {
+    console.error('PDF Error details:', JSON.stringify(error, null, 2));
+    throw error;
+  }
 };
 
 const handler = async (req: Request): Promise<Response> => {
@@ -384,14 +490,20 @@ const handler = async (req: Request): Promise<Response> => {
       
       if (startDateTime && endDateTime) {
         console.log(`Using datetime range: ${startDateTime} to ${endDateTime}`);
-        salesQuery = salesQuery
-          .gte('created_at', startDateTime)
-          .lt('created_at', endDateTime);
-          
+        // Query by sales_date for better accuracy with daily reports
         const merchantTimezone = merchantData?.timezone || 'America/New_York';
-        const startDate = new Date(startDateTime);
-        const endDate = new Date(endDateTime);
-        periodDescription = `${startDate.toLocaleDateString()} ${startDate.toLocaleTimeString()} - ${endDate.toLocaleDateString()} ${endDate.toLocaleTimeString()}`;
+        const startDate = getLocalReportDate(startDateTime, merchantTimezone);
+        const endDate = getLocalReportDate(endDateTime, merchantTimezone);
+        
+        console.log(`Converted to local dates: ${startDate} to ${endDate}`);
+        
+        salesQuery = salesQuery
+          .gte('sales_date', startDate)
+          .lte('sales_date', endDate);
+          
+        const startDateObj = new Date(startDateTime);
+        const endDateObj = new Date(endDateTime);
+        periodDescription = `${startDateObj.toLocaleDateString()} ${startDateObj.toLocaleTimeString()} - ${endDateObj.toLocaleDateString()} ${endDateObj.toLocaleTimeString()}`;
         actualReportDate = businessDayEnd ? getLocalReportDate(businessDayEnd, merchantTimezone) : getLocalReportDate(endDateTime, merchantTimezone);
       } else if (reportDate) {
         console.log(`Using date filter: ${reportDate}`);
@@ -434,7 +546,7 @@ const handler = async (req: Request): Promise<Response> => {
       endDateTime
     };
 
-    // Generate PDF using PDFKit
+    // Generate PDF using pdf-lib
     const shopName = (merchantData?.shop_name && merchantData.shop_name.trim()) || 'Default_Shop';
     const sanitizedShopName = shopName.replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${sanitizedShopName}-${actualReportDate}-${reportType}.pdf`;
@@ -442,7 +554,54 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log(`Generating PDF for ${reportData.merchantName} - ${actualReportDate}`);
     
-    const pdfBuffer = await createModernPDF(reportData);
+    let pdfBuffer: Uint8Array;
+    try {
+      pdfBuffer = await createModernPDF(reportData);
+    } catch (pdfError) {
+      console.error('PDF generation failed, creating fallback text report:', pdfError);
+      // Fallback: create a simple text-based PDF if main generation fails
+      const fallbackPdf = await PDFDocument.create();
+      const page = fallbackPdf.addPage();
+      const font = await fallbackPdf.embedFont(StandardFonts.Helvetica);
+      
+      page.drawText(`Sales Report - ${reportData.merchantName}`, {
+        x: 50,
+        y: 750,
+        size: 20,
+        font,
+      });
+      
+      page.drawText(`Date: ${actualReportDate}`, {
+        x: 50,
+        y: 720,
+        size: 12,
+        font,
+      });
+      
+      page.drawText(`Total Sales: $${reportData.totalSales.toLocaleString()}`, {
+        x: 50,
+        y: 690,
+        size: 12,
+        font,
+      });
+      
+      page.drawText(`Total Commission: $${reportData.totalCommission.toLocaleString()}`, {
+        x: 50,
+        y: 660,
+        size: 12,
+        font,
+      });
+      
+      page.drawText(`Employees: ${reportData.employees.length}`, {
+        x: 50,
+        y: 630,
+        size: 12,
+        font,
+      });
+      
+      const fallbackBytes = await fallbackPdf.save();
+      pdfBuffer = new Uint8Array(fallbackBytes);
+    }
     
     console.log('PDF content created, uploading to storage...');
 

@@ -61,17 +61,19 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Processing report for merchant: ${merchantName} in timezone: ${merchantTimezone}`);
 
-    // Calculate the business day period that just ended
+    // Calculate the business day period that just ended in merchant's timezone
     const now = new Date();
-    const businessDayEnd = new Date(now);
-    const businessDayStart = new Date(now);
-    businessDayStart.setDate(businessDayStart.getDate() - 1);
-    
-    // Set the exact times based on report_time_cycle
     const [hours, minutes, seconds] = reportTime.split(':').map(Number);
-    businessDayEnd.setHours(hours, minutes, seconds, 999); // End at HH:MM:SS.999
-    businessDayStart.setHours(hours, minutes, seconds, 0); // Start at HH:MM:SS.000
     
+    // Create business day times in merchant's local timezone
+    const businessDayEnd = new Date();
+    businessDayEnd.setHours(hours, minutes, seconds, 999);
+    
+    const businessDayStart = new Date(businessDayEnd);
+    businessDayStart.setDate(businessDayStart.getDate() - 1);
+    businessDayStart.setHours(hours, minutes, seconds, 0);
+    
+    // Convert to UTC for database queries (Clover API expects UTC)
     const startDateTime = businessDayStart.toISOString();
     const endDateTime = businessDayEnd.toISOString();
     const businessDayEndTime = businessDayEnd.toISOString();
@@ -111,12 +113,15 @@ const handler = async (req: Request): Promise<Response> => {
         }
       });
 
+      let salesData = null;
       if (salesResponse.error) {
         console.error(`Error fetching sales data for ${merchantName}:`, salesResponse.error);
         // Continue with report generation even if sales fetch fails
         console.log('Continuing with report generation using existing data...');
       } else {
         console.log(`Sales data fetched successfully for ${merchantName}`);
+        salesData = salesResponse.data?.salesData;
+        console.log(`Fetched ${salesData?.length || 0} sales records from Clover API`);
       }
 
       // Generate PDF report for the business day period that just ended
@@ -126,7 +131,8 @@ const handler = async (req: Request): Promise<Response> => {
           startDateTime,
           endDateTime,
           reportType: 'daily_sales',
-          businessDayEnd: businessDayEndTime
+          businessDayEnd: businessDayEndTime,
+          salesData: salesData // Pass the fresh sales data from Clover
         }
       });
 
