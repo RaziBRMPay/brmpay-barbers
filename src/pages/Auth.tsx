@@ -10,10 +10,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Scissors, BarChart3 } from 'lucide-react';
 
 const Auth = () => {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, resetPassword } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -28,6 +31,7 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     try {
       const { error } = isSignUp 
@@ -36,6 +40,29 @@ const Auth = () => {
 
       if (error) {
         setError(error.message);
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const { error } = await resetPassword(resetEmail);
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        setSuccess(`Password reset email sent to ${resetEmail}. Please check your inbox.`);
+        setShowResetForm(false);
+        setResetEmail('');
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -130,13 +157,70 @@ const Auth = () => {
                     </Alert>
                   )}
 
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Signing in...' : 'Sign In'}
-                  </Button>
+                  {success && (
+                    <Alert className="border-success bg-success/10">
+                      <AlertDescription className="text-success">{success}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {!showResetForm ? (
+                    <>
+                      <Button 
+                        type="submit" 
+                        className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300"
+                        disabled={isLoading}
+                      >
+                        {isLoading ? 'Signing in...' : 'Sign In'}
+                      </Button>
+                      
+                      <div className="text-center">
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="text-sm text-muted-foreground hover:text-primary"
+                          onClick={() => setShowResetForm(true)}
+                        >
+                          Forgot your password?
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-email">Reset Password</Label>
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="Enter your email"
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          required
+                        />
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          type="button"
+                          onClick={handleResetPassword}
+                          className="flex-1 bg-gradient-primary hover:shadow-glow transition-all duration-300"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? 'Sending...' : 'Send Reset Email'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowResetForm(false);
+                            setResetEmail('');
+                            setError('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </TabsContent>
               
