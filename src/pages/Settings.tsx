@@ -120,6 +120,35 @@ const Settings = () => {
       
       if (data?.shopName) {
         setCloverShopName(data.shopName);
+        
+        // Auto-sync to database if current name is generic or empty
+        const currentShopName = merchantData?.shop_name || '';
+        const isGenericName = !currentShopName || 
+                             currentShopName.toLowerCase().includes('default') ||
+                             currentShopName.toLowerCase().includes('shop') ||
+                             currentShopName.trim() === '';
+        
+        if (isGenericName && data.shopName !== currentShopName) {
+          try {
+            const { error: updateError } = await supabase
+              .from('merchants')
+              .update({ shop_name: data.shopName })
+              .eq('id', merchantId);
+            
+            if (!updateError) {
+              // Update local state to reflect the change
+              setMerchantData(prev => prev ? { ...prev, shop_name: data.shopName } : null);
+              setFormData(prev => ({ ...prev, shop_name: data.shopName }));
+              
+              toast({
+                title: 'Shop Name Synced',
+                description: `Updated shop name to "${data.shopName}" from Clover.`,
+              });
+            }
+          } catch (syncError) {
+            console.error('Error syncing shop name to database:', syncError);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching Clover shop name:', error);
