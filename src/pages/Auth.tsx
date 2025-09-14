@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Scissors, BarChart3 } from 'lucide-react';
 
 const Auth = () => {
-  const { user, loading, signIn, signUp, resetPassword } = useAuth();
+  const { user, profile, loading, signIn, signUp, resetPassword } = useAuth();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -22,10 +23,23 @@ const Auth = () => {
     password: ''
   });
 
-  // Don't redirect while still loading to avoid infinite loop
-  if (user && !loading) {
-    return <Navigate to="/" replace />;
-  }
+  // Role-based redirect when user is authenticated
+  useEffect(() => {
+    if (user && profile && !loading) {
+      switch (profile.role) {
+        case 'admin':
+          navigate('/admin');
+          break;
+        case 'sub_admin':
+          navigate('/sub-admin');
+          break;
+        case 'merchant':
+        default:
+          navigate('/');
+          break;
+      }
+    }
+  }, [user, profile, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent, isSignUp: boolean) => {
     e.preventDefault();

@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import SecuritySettings from "./pages/SecuritySettings";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
+import Unauthorized from "./pages/Unauthorized";
 
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const App = () => (
               </ProtectedRoute>
             } />
             
+            <Route path="/unauthorized" element={<Unauthorized />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
