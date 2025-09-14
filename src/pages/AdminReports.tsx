@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DatePickerWithRange } from '@/components/ui/date-picker-with-range';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart3, TrendingUp, DollarSign, Users, Download, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { BarChart3, TrendingUp, DollarSign, Users, Download, Eye, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { addDays } from 'date-fns';
@@ -27,6 +28,8 @@ interface ReportSummary {
   total_sales: number;
   total_commissions: number;
   created_at: string;
+  file_url: string | null;
+  file_name: string | null;
 }
 
 const AdminReports = () => {
@@ -43,10 +46,12 @@ const AdminReports = () => {
     to: new Date()
   });
   const [reportTypeFilter, setReportTypeFilter] = useState('all');
+  const [merchantFilter, setMerchantFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchReportsData();
-  }, [dateRange, reportTypeFilter]);
+  }, [dateRange, reportTypeFilter, merchantFilter]);
 
   const fetchReportsData = async () => {
     try {
@@ -55,7 +60,7 @@ const AdminReports = () => {
         .from('merchants')
         .select('id');
 
-      const { data: reportsData } = await supabase
+      let query = supabase
         .from('reports')
         .select(`
           id,
@@ -63,20 +68,28 @@ const AdminReports = () => {
           report_type,
           report_data,
           created_at,
+          file_url,
+          file_name,
           merchants!reports_merchant_id_fkey (
             shop_name
           )
         `)
-        .gte('report_date', dateRange.from?.toISOString().split('T')[0])
-        .lte('report_date', dateRange.to?.toISOString().split('T')[0])
-        .eq(reportTypeFilter !== 'all' ? 'report_type' : 'report_type', reportTypeFilter !== 'all' ? reportTypeFilter : undefined);
+        .gte('report_date', dateRange?.from?.toISOString().split('T')[0] || '2020-01-01')
+        .lte('report_date', dateRange?.to?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0])
+        .order('created_at', { ascending: false });
+
+      if (reportTypeFilter !== 'all') {
+        query = query.eq('report_type', reportTypeFilter);
+      }
+
+      const { data: reportsData } = await query;
 
       if (reportsData) {
         // Calculate aggregated stats from report data
         let totalRevenue = 0;
         let totalCommissions = 0;
 
-        const formattedReports: ReportSummary[] = reportsData.map(report => {
+        let formattedReports: ReportSummary[] = reportsData.map(report => {
           const reportData = report.report_data as any;
           const sales = reportData?.totalSales || 0;
           const commissions = reportData?.totalCommissions || 0;
@@ -91,9 +104,27 @@ const AdminReports = () => {
             report_type: report.report_type,
             total_sales: sales,
             total_commissions: commissions,
-            created_at: report.created_at
+            created_at: report.created_at,
+            file_url: report.file_url,
+            file_name: report.file_name
           };
         });
+
+        // Apply merchant filter
+        if (merchantFilter) {
+          formattedReports = formattedReports.filter(report => 
+            report.merchant_name.toLowerCase().includes(merchantFilter.toLowerCase())
+          );
+        }
+
+        // Apply search filter
+        if (searchTerm) {
+          formattedReports = formattedReports.filter(report => 
+            report.merchant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            report.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            report.report_type.toLowerCase().includes(searchTerm.toLowerCase())
+          );
+        }
 
         setStats({
           totalRevenue,
@@ -115,6 +146,66 @@ const AdminReports = () => {
       setLoading(false);
     }
   };
+
+  const handleDownload = async (fileUrl: string | null, fileName: string | null) => {
+    if (!fileUrl) {
+      toast({
+        title: "Error",
+        description: "No file available for download",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(fileUrl);
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Success",
+        description: "Report downloaded successfully",
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to download report",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePreview = (fileUrl: string | null) => {
+    if (!fileUrl) {
+      toast({
+        title: "Error",
+        description: "No file available for preview",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    window.open(fileUrl, '_blank');
+  };
+
+  const filteredReports = reports.filter(report => {
+    const matchesSearch = !searchTerm || 
+      report.merchant_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      report.report_type.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesSearch;
+  });
 
   if (loading) {
     return (
@@ -204,10 +295,10 @@ const AdminReports = () => {
         {/* Filters */}
         <Card className="shadow-soft border-0 bg-gradient-card">
           <CardHeader>
-            <CardTitle>Filter Reports</CardTitle>
+            <CardTitle>Filter & Search Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Date Range</label>
                 <DatePickerWithRange
@@ -229,6 +320,14 @@ const AdminReports = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Search</label>
+                <Input
+                  placeholder="Search reports, merchants..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
               <div className="flex items-end">
                 <Button className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300">
                   <Download className="h-4 w-4 mr-2" />
@@ -239,13 +338,16 @@ const AdminReports = () => {
           </CardContent>
         </Card>
 
-        {/* Reports Table */}
+        {/* PDF Reports Table */}
         <Card className="shadow-soft border-0 bg-gradient-card">
           <CardHeader>
-            <CardTitle>Recent Reports ({reports.length})</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Generated PDF Reports ({filteredReports.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {reports.length === 0 ? (
+            {filteredReports.length === 0 ? (
               <div className="text-center py-8">
                 <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No reports found for the selected criteria</p>
@@ -258,6 +360,7 @@ const AdminReports = () => {
                       <TableHead>Merchant</TableHead>
                       <TableHead>Report Date</TableHead>
                       <TableHead>Type</TableHead>
+                      <TableHead>File Name</TableHead>
                       <TableHead>Sales</TableHead>
                       <TableHead>Commissions</TableHead>
                       <TableHead>Generated</TableHead>
@@ -265,7 +368,7 @@ const AdminReports = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reports.map((report) => (
+                    {filteredReports.map((report) => (
                       <TableRow key={report.id}>
                         <TableCell className="font-medium">
                           {report.merchant_name}
@@ -278,6 +381,9 @@ const AdminReports = () => {
                             {report.report_type.replace('_', ' ')}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {report.file_name || 'No file'}
+                        </TableCell>
                         <TableCell className="text-success">
                           ${report.total_sales.toLocaleString()}
                         </TableCell>
@@ -289,10 +395,22 @@ const AdminReports = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex space-x-2">
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handlePreview(report.file_url)}
+                              disabled={!report.file_url}
+                              title="Preview PDF"
+                            >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleDownload(report.file_url, report.file_name)}
+                              disabled={!report.file_url}
+                              title="Download PDF"
+                            >
                               <Download className="h-4 w-4" />
                             </Button>
                           </div>
