@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Users, Building2, Settings, TrendingUp, AlertTriangle, Clock } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
@@ -228,30 +229,30 @@ const AdminDashboard = () => {
                 className="w-full justify-start bg-gradient-primary hover:shadow-glow transition-all duration-300"
                 asChild
               >
-                <a href="/admin/users">
+                <Link to="/admin/users">
                   <Users className="mr-2 h-4 w-4" />
                   Manage Users
-                </a>
+                </Link>
               </Button>
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
                 asChild
               >
-                <a href="/admin/merchants">
+                <Link to="/admin/merchants">
                   <Building2 className="mr-2 h-4 w-4" />
                   View Merchants
-                </a>
+                </Link>
               </Button>
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
                 asChild
               >
-                <a href="/admin/reports">
+                <Link to="/admin/reports">
                   <TrendingUp className="mr-2 h-4 w-4" />
                   Platform Reports
-                </a>
+                </Link>
               </Button>
               <Button 
                 variant="outline" 

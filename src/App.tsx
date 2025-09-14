@@ -10,7 +10,11 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
+import AdminMerchants from "./pages/AdminMerchants";
+import AdminReports from "./pages/AdminReports";
 import SubAdminDashboard from "./pages/SubAdminDashboard";
+import SubAdminStores from "./pages/SubAdminStores";
+import SubAdminReports from "./pages/SubAdminReports";
 import Settings from "./pages/Settings";
 import SecuritySettings from "./pages/SecuritySettings";
 import Reports from "./pages/Reports";
@@ -62,11 +66,31 @@ const App = () => (
                 <AdminUsers />
               </ProtectedRoute>
             } />
+            <Route path="/admin/merchants" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminMerchants />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin/reports" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminReports />
+              </ProtectedRoute>
+            } />
             
             {/* Sub Admin Routes */}
             <Route path="/sub-admin" element={
               <ProtectedRoute allowedRoles={['sub_admin']}>
                 <SubAdminDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/sub-admin/stores" element={
+              <ProtectedRoute allowedRoles={['sub_admin']}>
+                <SubAdminStores />
+              </ProtectedRoute>
+            } />
+            <Route path="/sub-admin/reports" element={
+              <ProtectedRoute allowedRoles={['sub_admin']}>
+                <SubAdminReports />
               </ProtectedRoute>
             } />
             
