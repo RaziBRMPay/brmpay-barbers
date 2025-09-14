@@ -59,7 +59,7 @@ const AdminUsers = () => {
         .from('profiles')
         .select(`
           *,
-          merchants (
+          merchants!merchants_user_id_fkey (
             shop_name,
             timezone
           )

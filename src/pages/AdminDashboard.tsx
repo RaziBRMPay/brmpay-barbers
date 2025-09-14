@@ -244,16 +244,26 @@ const AdminDashboard = () => {
                   View Merchants
                 </Link>
               </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                asChild
-              >
-                <Link to="/admin/reports">
-                  <TrendingUp className="mr-2 h-4 w-4" />
-                  Platform Reports
-                </Link>
-              </Button>
+               <Button 
+                 variant="outline" 
+                 className="w-full justify-start"
+                 asChild
+               >
+                 <Link to="/admin/reports">
+                   <TrendingUp className="mr-2 h-4 w-4" />
+                   Platform Reports
+                 </Link>
+               </Button>
+               <Button 
+                 variant="outline" 
+                 className="w-full justify-start"
+                 asChild
+               >
+                 <Link to="/admin/barbers">
+                   <Users className="mr-2 h-4 w-4" />
+                   Barber Reports
+                 </Link>
+               </Button>
               <Button 
                 variant="outline" 
                 className="w-full justify-start"
